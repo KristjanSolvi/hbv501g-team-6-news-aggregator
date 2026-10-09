@@ -1,17 +1,9 @@
 package is.hi.team6.newsaggregator;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.authenticated;
-import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.unauthenticated;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import java.time.Instant;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -22,7 +14,15 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.authenticated;
+import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.unauthenticated;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import org.springframework.transaction.annotation.Transactional;
 
 import is.hi.team6.newsaggregator.dto.RegistrationRequest;
@@ -30,6 +30,8 @@ import is.hi.team6.newsaggregator.model.Article;
 import is.hi.team6.newsaggregator.model.Favourite;
 import is.hi.team6.newsaggregator.model.NewsSource;
 import is.hi.team6.newsaggregator.model.UserAccount;
+import is.hi.team6.newsaggregator.repository.ArticleRepository;
+import is.hi.team6.newsaggregator.repository.NewsSourceRepository;
 import is.hi.team6.newsaggregator.repository.UserAccountRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceException;
@@ -45,6 +47,8 @@ class NewsaggregatorApplicationTests {
     @Autowired UserAccountRepository accounts;
     @Autowired PasswordEncoder passwords;
     @Autowired EntityManager entities;
+    @Autowired NewsSourceRepository sources;
+    @Autowired ArticleRepository articles;
 
     @Test
     void registrationStoresOnlyAPasswordHashAndCannotCreateAnAdmin() throws Exception {
@@ -217,6 +221,118 @@ class NewsaggregatorApplicationTests {
                 .isInstanceOf(PersistenceException.class);
     }
 
+    @Test
+void adminCanImportArticlesFromApprovedSource() throws Exception {
+    var source = sources.saveAndFlush(
+            new NewsSource("Example News", "https://example.com"));
+
+    String request = """
+            {
+              "sourceId": %d,
+              "articles": [
+                {
+                  "title": "Imported article",
+                  "content": "Imported article body",
+                  "url": "https://example.com/article/1",
+                  "category": "Science",
+                  "publishedAt": "2026-10-09T12:00:00Z"
+                }
+              ]
+            }
+            """.formatted(source.getId());
+
+    mvc.perform(post("/api/admin/articles/import")
+                    .with(user("admin@example.com").roles("ADMIN"))
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(request))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$[0].title").value("Imported article"))
+            .andExpect(jsonPath("$[0].source.id").value(source.getId()))
+            .andExpect(jsonPath("$[0].source.name").value("Example News"));
+
+    assertThat(articles.count()).isEqualTo(1);
+}
+
+@Test
+void regularUserCannotImportArticles() throws Exception {
+    mvc.perform(post("/api/admin/articles/import")
+                    .with(user("reader@example.com").roles("USER"))
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                            {
+                              "sourceId": 1,
+                              "articles": [
+                                {
+                                  "title": "Article",
+                                  "category": "News",
+                                  "publishedAt": "2026-10-09T12:00:00Z"
+                                }
+                              ]
+                            }
+                            """))
+            .andExpect(status().isForbidden());
+}
+
+@Test
+void importRejectsUnknownNewsSource() throws Exception {
+    mvc.perform(post("/api/admin/articles/import")
+                    .with(user("admin@example.com").roles("ADMIN"))
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                            {
+                              "sourceId": 999999,
+                              "articles": [
+                                {
+                                  "title": "Article",
+                                  "category": "News",
+                                  "publishedAt": "2026-10-09T12:00:00Z"
+                                }
+                              ]
+                            }
+                            """))
+            .andExpect(status().isNotFound());
+}
+
+@Test
+void importRejectsEmptyArticleList() throws Exception {
+    mvc.perform(post("/api/admin/articles/import")
+                    .with(user("admin@example.com").roles("ADMIN"))
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                            {
+                              "sourceId": 1,
+                              "articles": []
+                            }
+                            """))
+            .andExpect(status().isBadRequest());
+}
+
+@Test
+void unauthenticatedUserCannotImportArticles() throws Exception {
+    mvc.perform(post("/api/admin/articles/import")
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                            {
+                              "sourceId": 1,
+                              "articles": [
+                                {
+                                  "title": "Imported article",
+                                  "content": "Article body",
+                                  "url": "https://example.com/article",
+                                  "category": "Science",
+                                  "publishedAt": "2026-10-09T12:00:00Z"
+                                }
+                              ]
+                            }
+                            """))
+            .andExpect(status().isUnauthorized());
+}
+
     private UserAccount createAccount() {
         return accounts.saveAndFlush(new UserAccount("reader@example.com", passwords.encode("password123")));
     }
@@ -227,5 +343,7 @@ class NewsaggregatorApplicationTests {
         entities.persist(article);
         return article;
     }
+
+    
 
 }
