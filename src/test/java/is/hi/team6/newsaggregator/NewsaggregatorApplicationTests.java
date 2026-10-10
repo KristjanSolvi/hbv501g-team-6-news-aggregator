@@ -333,6 +333,109 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
             .andExpect(status().isUnauthorized());
 }
 
+
+
+        @Test
+        void authenticatedUserCanCreateArticleWithoutSource() throws Exception {
+        var account = createAccount();
+
+        mvc.perform(post("/api/articles")
+                        .with(user("reader@example.com").roles("USER"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                "title": "My first article",
+                                "content": "This is the article body",
+                                "url": "https://example.com/my-article",
+                                "category": "Technology",
+                                "publishedAt": "2026-10-10T12:00:00Z"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.title").value("My first article"))
+                .andExpect(jsonPath("$.content").value("This is the article body"))
+                .andExpect(jsonPath("$.category").value("Technology"))
+                .andExpect(jsonPath("$.ownerId").value(account.getId()))
+                .andExpect(jsonPath("$.source").value(
+                        org.hamcrest.Matchers.nullValue()));
+
+        assertThat(articles.count()).isEqualTo(1);
+        }
+
+
+        @Test
+        void authenticatedUserCanCreateArticleWithSource() throws Exception {
+        var account = createAccount();
+        var source = sources.saveAndFlush(
+                new NewsSource("Example News", "https://example.com"));
+
+        String request = """
+                {
+                "title": "Article with source",
+                "content": "Article body",
+                "url": "https://example.com/article",
+                "category": "Science",
+                "publishedAt": "2026-10-10T12:00:00Z",
+                "sourceId": %d
+                }
+                """.formatted(source.getId());
+
+        mvc.perform(post("/api/articles")
+                        .with(user("reader@example.com").roles("USER"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.title").value("Article with source"))
+                .andExpect(jsonPath("$.source.id").value(source.getId()))
+                .andExpect(jsonPath("$.source.name").value("Example News"))
+                .andExpect(jsonPath("$.ownerId").value(account.getId()));
+
+        assertThat(articles.count()).isEqualTo(1);
+        }
+
+
+        @Test
+        void createArticleRejectsUnknownNewsSource() throws Exception {
+        createAccount();
+
+        mvc.perform(post("/api/articles")
+                        .with(user("reader@example.com").roles("USER"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                "title": "Article with invalid source",
+                                "content": "Article body",
+                                "category": "Science",
+                                "publishedAt": "2026-10-10T12:00:00Z",
+                                "sourceId": 999999
+                                }
+                                """))
+                .andExpect(status().isNotFound());
+
+        assertThat(articles.count()).isZero();
+        }
+
+
+        @Test
+        void unauthenticatedUserCannotCreateArticle() throws Exception {
+        mvc.perform(post("/api/articles")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                "title": "Unauthorized article",
+                                "category": "Science",
+                                "publishedAt": "2026-10-10T12:00:00Z"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+
+        assertThat(articles.count()).isZero();
+        }
+
     private UserAccount createAccount() {
         return accounts.saveAndFlush(new UserAccount("reader@example.com", passwords.encode("password123")));
     }

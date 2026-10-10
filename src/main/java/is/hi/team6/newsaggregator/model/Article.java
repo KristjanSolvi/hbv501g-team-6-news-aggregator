@@ -80,4 +80,12 @@ public class Article {
     public NewsSource getSource() {
         return source;
     }
+
+    public String getContent() {
+    return content;
+    }
+
+    public UserAccount getOwner() {
+        return owner;
+    }
 }
