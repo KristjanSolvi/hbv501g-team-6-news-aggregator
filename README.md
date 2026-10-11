@@ -7,7 +7,7 @@ A Java Spring Boot backend for HBV501G Software Project 1.
 - Week 1: domain entities, database relationships, and controller/service/repository layers.
 - Week 2: UC1 View News Feed, UC4 Register Account, and UC5 Log In.
 
-UC2 View Article is also implemented.
+UC2 View Article and UC18 Manage User Accounts are also implemented.
 
 ## Run
 
@@ -34,7 +34,8 @@ Demo mode uses a separate, temporary database that resets on restart.
 ```
 
 Tests use their own in-memory database and cover registration, login sessions, CSRF,
-pagination, article retrieval, source relationships, and duplicate favourites.
+pagination, article retrieval, source relationships, duplicate favourites, and administrator
+account creation and updates, including authorization and rollback on conflicting emails.
 
 ## API
 
@@ -42,9 +43,11 @@ pagination, article retrieval, source relationships, and duplicate favourites.
 | --- | --- | --- |
 | GET | `/api/articles?page=0&size=20` | Public news feed |
 | GET | `/api/articles/{id}` | Public article details |
-| GET | `/api/auth/csrf` | Obtain a token for POST requests |
+| GET | `/api/auth/csrf` | Obtain a token for POST and PUT requests |
 | POST | `/api/auth/register` | Register with JSON fields `email` and `password` |
 | POST | `/api/auth/login` | Log in with form fields `email` and `password` |
+| POST | `/api/admin/accounts` | Administrator creates a new administrator account |
+| PUT | `/api/admin/accounts/{id}` | Administrator updates an existing account |
 
 The feed starts at page 0, accepts sizes from 1 to 100, and sorts newest first.
 Article IDs break ties when publication times match. Responses contain `content` (articles)
@@ -63,8 +66,21 @@ neither passwords nor hashes appear in API responses. Registration does not log 
 
 Login uses Spring Security's form handling and returns 204 with a session cookie.
 Invalid credentials return 401. Keep the cookie for subsequent requests; sessions expire
-after 30 minutes of inactivity. CSRF tokens protect POST requests against requests forged
+after 30 minutes of inactivity. CSRF tokens protect POST and PUT requests against requests forged
 by other websites. Missing or invalid tokens return 403. Fetch a new token after login.
+
+Administrator account creation requires an existing administrator session and a CSRF token.
+Send JSON with `email` and `password`, using the same validation rules as registration.
+Success returns 201 with the new account's ID, normalized email, and `ADMIN` role. Duplicate
+emails return 409; invalid input returns 400. Public registration still creates only `USER`
+accounts. The new administrator can log in through the existing login endpoint.
+
+Account updates require an administrator session and a CSRF token. Send JSON with a required
+`email` and an optional `password`; omitting the password or sending `null` preserves the
+existing password. A supplied password follows the registration rules. Successful updates
+return 200 with the account's ID, normalized email, and unchanged role. Invalid input returns
+400, unknown accounts return 404, and duplicate emails return 409 without changing the account.
+Unauthenticated requests with a valid CSRF token return 401; regular users receive 403.
 
 ### Try it with curl
 
@@ -90,7 +106,7 @@ curl -i -b "$cookies" -c "$cookies" -H "X-CSRF-TOKEN: $token" \
 ```
 
 In Postman, keep cookies enabled. First GET `/api/auth/csrf`, then copy its `token`
-into the `X-CSRF-TOKEN` header for POST requests. Use a raw JSON body for registration
+into the `X-CSRF-TOKEN` header for POST and PUT requests. Use a raw JSON body for registration
 and an `x-www-form-urlencoded` body for login.
 
 ## Code layout
@@ -101,13 +117,14 @@ All Java packages are under `src/main/java/is/hi/team6/newsaggregator`:
   Articles have optional source and owner references. Favourites link one account to one
   article, with a database constraint preventing duplicate pairs.
 - `repository`: Spring Data JPA interfaces provide database access.
-- `service`: feed ordering, article retrieval, account creation, and account lookup for login.
+- `service`: feed ordering, article retrieval, account creation and updates, and account lookup
+  for login. `ArticleService` and `AccountService` have corresponding `Impl` classes.
 - `controller`: request validation and API routes. Spring Security handles the login POST.
 - `dto`: small records defining request and response data without exposing entire entities.
 - `config`: password hashing, session login, public routes, and authentication errors.
 
 Start reading with `ArticleController` → `ArticleServiceImpl` → `ArticleRepository`, then
-`AuthController` → `AccountService` → `SecurityConfig`.
+`AuthController` / `AdminAccountController` → `AccountServiceImpl` → `SecurityConfig`.
 
 Source, ownership, and favourite relationships are the week 1 database foundation;
 their management endpoints belong to later weeks. Authentication currently uses sessions.

@@ -51,4 +51,16 @@ public class UserAccount {
     public Role getRole() {
         return role;
     }
+
+    public void changeEmail(String email) {
+        this.email = email;
+    }
+
+    public void changePasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public void changeRole(Role role) {
+        this.role = role;
+    }
 }
