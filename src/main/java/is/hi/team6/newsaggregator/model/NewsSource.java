@@ -39,4 +39,9 @@ public class NewsSource {
     public String getUrl() {
         return url;
     }
+
+    public void update(String name, String url){
+        this.name = name;
+        this.url = url;
+    }
 }
