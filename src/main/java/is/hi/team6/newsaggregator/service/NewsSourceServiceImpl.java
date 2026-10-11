@@ -43,7 +43,6 @@ public class NewsSourceServiceImpl implements NewsSourceService {
     public NewsSourceResponse updateSource(Long id, NewsSourceRequest request){
         Optional<NewsSource> maybeSource = repository.findById(id);
         NewsSource source;
-        NewsSourceResponse ret;
         if (maybeSource.isEmpty()) {
             throw new ResponseStatusException(
                                         HttpStatus.NOT_FOUND,
@@ -51,7 +50,7 @@ public class NewsSourceServiceImpl implements NewsSourceService {
         }
         source = maybeSource.get();
         if(request.name().isEmpty() || request.url().isEmpty()){
-            throw new IllegalArgumentException("Missing request name or url");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing name or url");
         }
         source.update(request.name(), request.url());
         source = repository.save(source);
@@ -70,7 +69,7 @@ public class NewsSourceServiceImpl implements NewsSourceService {
     public NewsSource getSource(Long id){
         Optional<NewsSource> temp = repository.findById(id);
         if (temp.isEmpty()) { //if the source doesnt exist returns null? kannski að skila tómum seinna?
-            return null;            
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing request id");
         }
         return temp.get();
     };
