@@ -186,6 +186,60 @@ class NewsaggregatorApplicationTests {
     }
 
     @Test
+    void publicArticleIncludesContentAndSourceWithoutExposingAccountDetails() throws Exception {
+        var source = sources.saveAndFlush(new NewsSource("Example News", "https://example.com"));
+        var owner = createAccount();
+        var article = createArticle("Full article", "2026-09-01T12:00:00Z", source, owner);
+        entities.persist(new Favourite(owner, article));
+        entities.flush();
+        entities.clear();
+
+        mvc.perform(get("/api/articles/{id}", article.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(article.getId()))
+                .andExpect(jsonPath("$.title").value("Full article"))
+                .andExpect(jsonPath("$.content").value("Article body"))
+                .andExpect(jsonPath("$.category").value("Science"))
+                .andExpect(jsonPath("$.publishedAt").value("2026-09-01T12:00:00Z"))
+                .andExpect(jsonPath("$.url").value("https://example.com/article"))
+                .andExpect(jsonPath("$.source.id").value(source.getId()))
+                .andExpect(jsonPath("$.source.name").value("Example News"))
+                .andExpect(jsonPath("$.source.url").value("https://example.com"))
+                .andExpect(jsonPath("$.ownerId").value(owner.getId()))
+                .andExpect(jsonPath("$.owner").doesNotExist())
+                .andExpect(jsonPath("$.passwordHash").doesNotExist());
+
+        assertThat(articles.count()).isEqualTo(1);
+        assertThat(accounts.count()).isEqualTo(1);
+        assertThat(entities.createQuery("select count(f) from Favourite f", Long.class).getSingleResult())
+                .isEqualTo(1);
+    }
+
+    @Test
+    void authenticatedReaderCanViewArticleWithoutSourceOrOwner() throws Exception {
+        var article = createArticle("Standalone article", "2026-09-01T12:00:00Z", null, null);
+
+        mvc.perform(get("/api/articles/{id}", article.getId()).with(user("reader@example.com")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Standalone article"))
+                .andExpect(jsonPath("$.source").isEmpty())
+                .andExpect(jsonPath("$.ownerId").isEmpty());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "-1", "abc", "1.5", "9223372036854775808"})
+    void invalidArticleIdentifiersAreRejected(String id) throws Exception {
+        mvc.perform(get("/api/articles/{id}", id)).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void unknownArticleReturnsNotFound() throws Exception {
+        mvc.perform(get("/api/articles/{id}", Long.MAX_VALUE))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Article not found"));
+    }
+
+    @Test
     void emptyFeedAndPagesBeyondTheEndAreSuccessful() throws Exception {
         mvc.perform(get("/api/articles"))
                 .andExpect(status().isOk())

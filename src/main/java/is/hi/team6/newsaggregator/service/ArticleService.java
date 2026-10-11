@@ -12,5 +12,7 @@ public interface ArticleService {
     Page<ArticleSummary> getFeed(int page, int size);
     Page<ArticleSummary> search(ArticleSearchCriteria criteria, int page, int size);
 
+    ArticleResponse getArticle(Long id);
+
     ArticleResponse createArticle(String email, ArticleCreateRequest request);
 }

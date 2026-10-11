@@ -27,7 +27,8 @@ public class SecurityConfig {
         return http
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/articles", "/api/articles/search", "/api/auth/csrf").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/articles", "/api/articles/search",
+                                "/api/articles/{id}", "/api/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
