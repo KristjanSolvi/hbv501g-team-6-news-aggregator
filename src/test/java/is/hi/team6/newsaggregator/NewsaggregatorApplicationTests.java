@@ -436,6 +436,77 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
         assertThat(articles.count()).isZero();
         }
 
+
+        @Test
+        void searchArticlesByKeyword() throws Exception {
+        var account = createAccount();
+
+        createArticle("Football news", "2026-10-10T12:00:00Z", null, account);
+        createArticle("Technology update", "2026-10-09T12:00:00Z", null, account);
+
+        entities.flush();
+
+        mvc.perform(get("/api/articles/search")
+                        .param("keyword", "football"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Football news"));
+        }
+
+
+        @Test
+        void searchArticlesByCategory() throws Exception {
+        var account = createAccount();
+
+        createArticle("Science article", "2026-10-10T12:00:00Z", null, account);
+        entities.flush();
+
+        mvc.perform(get("/api/articles/search")
+                        .param("category", "Science"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Science article"));
+
+        mvc.perform(get("/api/articles/search")
+                        .param("category", "Sports"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(0));
+        }
+
+        @Test
+        void searchArticlesBySource() throws Exception {
+        var account = createAccount();
+        var source = sources.saveAndFlush(
+                new NewsSource("Example News", "https://example.com"));
+
+        createArticle("From source", "2026-10-10T12:00:00Z", source, account);
+        createArticle("No source", "2026-10-09T12:00:00Z", null, account);
+        entities.flush();
+
+        mvc.perform(get("/api/articles/search")
+                        .param("sourceId", source.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("From source"));
+        }
+
+        @Test
+        void searchArticlesByDateRange() throws Exception {
+        var account = createAccount();
+
+        createArticle("Too old", "2026-10-01T12:00:00Z", null, account);
+        createArticle("Within range", "2026-10-10T12:00:00Z", null, account);
+        createArticle("Too new", "2026-10-20T12:00:00Z", null, account);
+        entities.flush();
+
+        mvc.perform(get("/api/articles/search")
+                        .param("from", "2026-10-05T00:00:00Z")
+                        .param("to", "2026-10-15T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Within range"));
+        }
+
     private UserAccount createAccount() {
         return accounts.saveAndFlush(new UserAccount("reader@example.com", passwords.encode("password123")));
     }
