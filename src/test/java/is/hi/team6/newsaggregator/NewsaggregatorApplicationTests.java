@@ -19,8 +19,13 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.authenticated;
 import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.unauthenticated;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import org.springframework.transaction.annotation.Transactional;
@@ -560,6 +565,117 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].title").value("Within range"));
         }
+        @Test 
+        void createNewsSource() throws Exception {
+        mvc.perform(post("/api/admin/newssources/create")
+                        .with(user("admin@example.com").roles("ADMIN"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                "name": "Miss Information",
+                                "url": "https://ms.information"
+                                }""")).andExpect(status().isCreated());
+        }
+
+        @Test 
+        void createNewsSourceInvalidUser() throws Exception {
+        mvc.perform(post("/api/admin/newssources/create")
+                        .with(user("USER@example.com").roles("USER"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                "name": "Miss Information",
+                                "url": "https://ms.information"
+                                }""")).andExpect(status().is4xxClientError());
+        }
+
+        @Test 
+        void getSources() throws Exception{
+                mvc.perform(post("/api/admin/newssources/create")
+                        .with(user("admin@example.com").roles("ADMIN"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                "name": "Miss Information",
+                                "url": "https://ms.information"
+                                }""")).andExpect(status().isCreated());
+                mvc.perform(get("/api/admin/newssources/sources")
+                        .with(user("admin@example.com").roles("ADMIN"))
+                        .with(csrf())).andExpect(status().isOk()).andExpect(jsonPath("$[0].name").value("Miss Information"));
+        }
+
+        @Test 
+        void updateSources() throws Exception{
+                Long id;
+                mvc.perform(post("/api/admin/newssources/create")
+                        .with(user("admin@example.com").roles("ADMIN"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                "name": "Miss Information",
+                                "url": "https://ms.information"
+                                }""")).andExpect(status().isCreated());
+                MvcResult response = mvc.perform(get("/api/admin/newssources/sources")
+                        .with(user("admin@example.com").roles("ADMIN"))
+                        .with(csrf())).andExpect(status().isOk())
+                        .andExpect(jsonPath("$[0].name")
+                        .value("Miss Information"))
+                        .andReturn();
+                var jsonMapper = JsonMapper.builder().build();
+                var json = jsonMapper.readTree(response.getResponse().getContentAsString());
+                id = json.get(0).get("id").longValue();
+                mvc.perform(put("/api/admin/newssources/"+id.toString())
+                        .with(user("admin@example.com").roles("ADMIN"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                        {
+                        "name":"Moss Information",
+                        "url":"https://ms.information"                
+                        }        
+                        """)).andExpect(status().isOk());
+                mvc.perform(get("/api/admin/newssources/sources")
+                        .with(user("admin@example.com").roles("ADMIN"))
+                        .with(csrf())).andExpect(status().isOk())
+                        .andExpect(jsonPath("$[0].name")
+                        .value("Moss Information"));     
+}
+        
+        @Test 
+        void deleteSource() throws Exception{
+                Long id;
+                mvc.perform(post("/api/admin/newssources/create")
+                        .with(user("admin@example.com").roles("ADMIN"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                "name": "Miss Information",
+                                "url": "https://ms.information"
+                                }""")).andExpect(status().isCreated());
+                MvcResult response = mvc.perform(get("/api/admin/newssources/sources")
+                        .with(user("admin@example.com").roles("ADMIN"))
+                        .with(csrf())).andExpect(status().isOk())
+                        .andExpect(jsonPath("$[0].name")
+                        .value("Miss Information"))
+                        .andReturn();
+                var jsonMapper = JsonMapper.builder().build();
+                var json = jsonMapper.readTree(response.getResponse().getContentAsString());
+                id = json.get(0).get("id").longValue();
+                mvc.perform(delete("/api/admin/newssources/"+id.toString())
+                        .with(user("admin@example.com").roles("ADMIN"))
+                        .with(csrf()))
+                        .andExpect(status().isNoContent());
+                mvc.perform(get("/api/admin/newssources/sources")
+                        .with(user("admin@example.com").roles("ADMIN"))
+                        .with(csrf())).andExpect(status().isOk())
+                        .andExpect(jsonPath("$[?(@.id == " + id + ")]")
+                        .doesNotExist());     
+}
 
     private UserAccount createAccount() {
         return accounts.saveAndFlush(new UserAccount("reader@example.com", passwords.encode("password123")));
