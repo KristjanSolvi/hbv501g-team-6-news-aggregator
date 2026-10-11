@@ -89,6 +89,14 @@ public class ArticleServiceImpl implements ArticleService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public ArticleResponse getArticle(Long id) {
+        var article = articles.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Article not found"));
+        return ArticleResponse.from(article);
+    }
+
+    @Override
     @Transactional
     public ArticleResponse createArticle(String email, ArticleCreateRequest request) {
         var owner = accounts.findByEmail(email)

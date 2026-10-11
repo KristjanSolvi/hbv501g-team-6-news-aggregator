@@ -7,6 +7,8 @@ A Java Spring Boot backend for HBV501G Software Project 1.
 - Week 1: domain entities, database relationships, and controller/service/repository layers.
 - Week 2: UC1 View News Feed, UC4 Register Account, and UC5 Log In.
 
+UC2 View Article is also implemented.
+
 ## Run
 
 Requires Java 17 or newer. The Maven wrapper downloads Maven and dependencies on its first run.
@@ -32,13 +34,14 @@ Demo mode uses a separate, temporary database that resets on restart.
 ```
 
 Tests use their own in-memory database and cover registration, login sessions, CSRF,
-pagination, source relationships, and duplicate favourites.
+pagination, article retrieval, source relationships, and duplicate favourites.
 
 ## API
 
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/api/articles?page=0&size=20` | Public news feed |
+| GET | `/api/articles/{id}` | Public article details |
 | GET | `/api/auth/csrf` | Obtain a token for POST requests |
 | POST | `/api/auth/register` | Register with JSON fields `email` and `password` |
 | POST | `/api/auth/login` | Log in with form fields `email` and `password` |
@@ -48,6 +51,10 @@ Article IDs break ties when publication times match. Responses contain `content`
 and `page` (`number`, `size`, `totalElements`, `totalPages`). Each article includes its
 source when available. Empty feeds and pages past the end return HTTP 200 with empty content.
 Invalid pagination returns 400.
+
+Article details include the full content, source information when available, and the owner ID
+when present. The identifier must be a positive integer; invalid identifiers return 400 and
+unknown articles return 404. Reading an article does not require login.
 
 Registration returns 201 with the account's ID, email, and `USER` role. Emails are
 case-insensitive and unique; duplicates return 409. Passwords must be 8–128 characters
@@ -65,6 +72,7 @@ These examples use Python 3 to read the CSRF token from JSON:
 
 ```sh
 curl 'http://localhost:8080/api/articles?page=0&size=2'
+curl 'http://localhost:8080/api/articles/1'
 
 cookies=$(mktemp)
 token=$(curl -s -c "$cookies" http://localhost:8080/api/auth/csrf |
@@ -93,12 +101,12 @@ All Java packages are under `src/main/java/is/hi/team6/newsaggregator`:
   Articles have optional source and owner references. Favourites link one account to one
   article, with a database constraint preventing duplicate pairs.
 - `repository`: Spring Data JPA interfaces provide database access.
-- `service`: feed ordering, account creation, and account lookup for login.
+- `service`: feed ordering, article retrieval, account creation, and account lookup for login.
 - `controller`: request validation and API routes. Spring Security handles the login POST.
 - `dto`: small records defining request and response data without exposing entire entities.
 - `config`: password hashing, session login, public routes, and authentication errors.
 
-Start reading with `ArticleController` → `ArticleService` → `ArticleRepository`, then
+Start reading with `ArticleController` → `ArticleServiceImpl` → `ArticleRepository`, then
 `AuthController` → `AccountService` → `SecurityConfig`.
 
 Source, ownership, and favourite relationships are the week 1 database foundation;

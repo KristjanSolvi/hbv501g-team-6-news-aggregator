@@ -6,6 +6,7 @@ import java.time.Instant;
 import org.springframework.data.web.PagedModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,7 +40,6 @@ public class ArticleController {
         return new PagedModel<>(articles.getFeed(page, size));
     }
 
-
     @GetMapping("/search")
     public PagedModel<ArticleSummary> search(
             @RequestParam(required = false) String keyword,
@@ -54,6 +54,11 @@ public class ArticleController {
                 keyword, sourceId, category, from, to);
 
         return new PagedModel<>(articles.search(criteria, page, size));
+    }
+
+    @GetMapping("/{id}")
+    public ArticleResponse getArticle(@PathVariable @Min(1) Long id) {
+        return articles.getArticle(id);
     }
 
     @PostMapping
