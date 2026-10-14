@@ -1,3 +1,4 @@
+
 package is.hi.team6.newsaggregator.dto;
 
 import java.time.Instant;
@@ -6,7 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-public record CreateArticleRequest(
+public record ArticleCreateRequest(
 
         @NotBlank
         @Size(max = 255)
@@ -21,6 +22,8 @@ public record CreateArticleRequest(
         String category,
 
         @NotNull
-        Instant publishedAt
+        Instant publishedAt,
+
+        Long sourceId
 
 ) {}
