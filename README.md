@@ -133,6 +133,18 @@ The team's JWT decision can be revisited with the later security material.
 Implementation references: [Spring Security form login](https://docs.spring.io/spring-security/reference/servlet/authentication/passwords/form.html)
 and [CSRF protection](https://docs.spring.io/spring-security/reference/servlet/exploits/csrf.html).
 
+## API Documentation
+
+Interactive API documentation is available when the application is running:
+
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+
+The documentation is generated automatically from the REST controllers.
+
+Note: `POST /api/auth/login` is handled by Spring Security rather than a REST
+controller, so it is not automatically discovered by OpenAPI.
+
 ## Team
 
 - Alexander Viðar Garðarsson
