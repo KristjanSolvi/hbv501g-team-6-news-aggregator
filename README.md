@@ -7,7 +7,7 @@ A Java Spring Boot backend for HBV501G Software Project 1.
 - Week 1: domain entities, database relationships, and controller/service/repository layers.
 - Week 2: UC1 View News Feed, UC4 Register Account, and UC5 Log In.
 
-UC2 View Article and UC18 Manage User Accounts are also implemented.
+UC2 View Article, UC6 View Account, and UC18 Manage User Accounts are also implemented.
 
 ## Run
 
@@ -46,6 +46,7 @@ account creation and updates, including authorization and rollback on conflictin
 | GET | `/api/auth/csrf` | Obtain a token for POST and PUT requests |
 | POST | `/api/auth/register` | Register with JSON fields `email` and `password` |
 | POST | `/api/auth/login` | Log in with form fields `email` and `password` |
+| GET | `/api/accounts/me` | View the logged-in user's own account |
 | POST | `/api/admin/accounts` | Administrator creates a new administrator account |
 | PUT | `/api/admin/accounts/{id}` | Administrator updates an existing account |
 
@@ -68,6 +69,10 @@ Login uses Spring Security's form handling and returns 204 with a session cookie
 Invalid credentials return 401. Keep the cookie for subsequent requests; sessions expire
 after 30 minutes of inactivity. CSRF tokens protect POST and PUT requests against requests forged
 by other websites. Missing or invalid tokens return 403. Fetch a new token after login.
+
+Viewing your account requires a login session and returns your ID, email, and role. The account
+is selected from the authenticated user, not a supplied ID or email. Passwords and hashes are
+never returned. Unauthenticated requests return 401; a missing account returns 404.
 
 Administrator account creation requires an existing administrator session and a CSRF token.
 Send JSON with `email` and `password`, using the same validation rules as registration.

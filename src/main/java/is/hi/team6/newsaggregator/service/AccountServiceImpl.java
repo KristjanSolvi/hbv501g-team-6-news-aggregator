@@ -36,6 +36,14 @@ public class AccountServiceImpl implements AccountService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public AccountResponse getOwnAccount(String email) {
+        var account = accounts.findByEmail(normalizeEmail(email))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
+        return AccountResponse.from(account);
+    }
+
+    @Override
     public AccountResponse createAdmin(RegistrationRequest request) {
         var account = new UserAccount(normalizeEmail(request.email()), passwords.encode(request.password()));
         account.changeRole(UserAccount.Role.ADMIN);
