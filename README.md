@@ -7,7 +7,8 @@ A Java Spring Boot backend for HBV501G Software Project 1.
 - Week 1: domain entities, database relationships, and controller/service/repository layers.
 - Week 2: UC1 View News Feed, UC4 Register Account, and UC5 Log In.
 
-UC2 View Article, UC6 View Account, and UC18 Manage User Accounts are also implemented.
+UC2 View Article, UC6 View Account, UC7 Modify Account, and UC18 Manage User Accounts
+are also implemented.
 
 ## Run
 
@@ -34,8 +35,9 @@ Demo mode uses a separate, temporary database that resets on restart.
 ```
 
 Tests use their own in-memory database and cover registration, login sessions, CSRF,
-pagination, article retrieval, source relationships, duplicate favourites, and administrator
-account creation and updates, including authorization and rollback on conflicting emails.
+pagination, article retrieval, source relationships, duplicate favourites, own-account viewing
+and updates, and administrator account management, including authorization and rollback on
+conflicting emails.
 
 ## API
 
@@ -47,6 +49,7 @@ account creation and updates, including authorization and rollback on conflictin
 | POST | `/api/auth/register` | Register with JSON fields `email` and `password` |
 | POST | `/api/auth/login` | Log in with form fields `email` and `password` |
 | GET | `/api/accounts/me` | View the logged-in user's own account |
+| PUT | `/api/accounts/me` | Update the logged-in user's own email and optional password |
 | POST | `/api/admin/accounts` | Administrator creates a new administrator account |
 | PUT | `/api/admin/accounts/{id}` | Administrator updates an existing account |
 
@@ -71,8 +74,18 @@ after 30 minutes of inactivity. CSRF tokens protect POST and PUT requests agains
 by other websites. Missing or invalid tokens return 403. Fetch a new token after login.
 
 Viewing your account requires a login session and returns your ID, email, and role. The account
-is selected from the authenticated user, not a supplied ID or email. Passwords and hashes are
+is selected from the account ID stored at login, not a supplied ID or email. Passwords and hashes are
 never returned. Unauthenticated requests return 401; a missing account returns 404.
+
+Updating your own account requires a login session and a CSRF token. Send JSON with a required
+`email` and optional `password`, using the same validation rules as administrator updates below.
+The account is selected from the session; a supplied ID or role cannot change the target or
+grant administrator access. Success returns 200 with your ID, normalized email, and unchanged
+role. The current session is updated when your email changes, so you remain logged in. Future
+logins use the new credentials. Both account endpoints use the stable account ID, so other
+sessions still access the same account if its old email is reused. Invalid input returns 400,
+missing accounts return 404, and duplicate emails return 409 without changing either the email
+or password.
 
 Administrator account creation requires an existing administrator session and a CSRF token.
 Send JSON with `email` and `password`, using the same validation rules as registration.
@@ -80,8 +93,8 @@ Success returns 201 with the new account's ID, normalized email, and `ADMIN` rol
 emails return 409; invalid input returns 400. Public registration still creates only `USER`
 accounts. The new administrator can log in through the existing login endpoint.
 
-Account updates require an administrator session and a CSRF token. Send JSON with a required
-`email` and an optional `password`; omitting the password or sending `null` preserves the
+Administrator account updates require an administrator session and a CSRF token. Send JSON
+with a required `email` and an optional `password`; omitting the password or sending `null` preserves the
 existing password. A supplied password follows the registration rules. Successful updates
 return 200 with the account's ID, normalized email, and unchanged role. Invalid input returns
 400, unknown accounts return 404, and duplicate emails return 409 without changing the account.

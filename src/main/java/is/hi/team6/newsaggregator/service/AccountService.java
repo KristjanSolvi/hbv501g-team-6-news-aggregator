@@ -10,7 +10,9 @@ public interface AccountService extends UserDetailsService {
 
     AccountResponse register(RegistrationRequest request);
 
-    AccountResponse getOwnAccount(String email);
+    AccountResponse getOwnAccount(Long id);
+
+    AccountResponse updateOwnAccount(Long id, UpdateAccountRequest request);
 
     AccountResponse createAdmin(RegistrationRequest request);
 

@@ -4,7 +4,6 @@ import java.util.Locale;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -37,10 +36,14 @@ public class AccountServiceImpl implements AccountService {
 
     @Override
     @Transactional(readOnly = true)
-    public AccountResponse getOwnAccount(String email) {
-        var account = accounts.findByEmail(normalizeEmail(email))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
-        return AccountResponse.from(account);
+    public AccountResponse getOwnAccount(Long id) {
+        return AccountResponse.from(findAccount(id));
+    }
+
+    @Override
+    @Transactional
+    public AccountResponse updateOwnAccount(Long id, UpdateAccountRequest request) {
+        return updateAccount(findAccount(id), request);
     }
 
     @Override
@@ -53,21 +56,27 @@ public class AccountServiceImpl implements AccountService {
     @Override
     @Transactional
     public AccountResponse updateOtherAccount(Long id, UpdateAccountRequest request) {
-        var account = accounts.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
-        account.changeEmail(normalizeEmail(request.email()));
-        if (request.password() != null) {
-            account.changePasswordHash(passwords.encode(request.password()));
-        }
-        return saveAccount(account);
+        return updateAccount(findAccount(id), request);
     }
 
     @Override
     public UserDetails loadUserByUsername(String email) {
         var account = accounts.findByEmail(normalizeEmail(email))
                 .orElseThrow(() -> new UsernameNotFoundException("Invalid email or password"));
-        return User.withUsername(account.getEmail())
-                .password(account.getPasswordHash()).roles(account.getRole().name()).build();
+        return new AccountUserDetails(account.getId(), account.getEmail(), account.getPasswordHash(), account.getRole());
+    }
+
+    private UserAccount findAccount(Long id) {
+        return accounts.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
+    }
+
+    private AccountResponse updateAccount(UserAccount account, UpdateAccountRequest request) {
+        account.changeEmail(normalizeEmail(request.email()));
+        if (request.password() != null) {
+            account.changePasswordHash(passwords.encode(request.password()));
+        }
+        return saveAccount(account);
     }
 
     private AccountResponse saveAccount(UserAccount account) {
