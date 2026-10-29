@@ -11,7 +11,12 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
 @Entity
-@Table(name = "favourites", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "article_id"}))
+@Table(
+        name = "favourites",
+        uniqueConstraints = @UniqueConstraint(
+                columnNames = {"user_id", "article_id"}
+        )
+)
 public class Favourite {
 
     @Id
@@ -31,5 +36,17 @@ public class Favourite {
     public Favourite(UserAccount user, Article article) {
         this.user = user;
         this.article = article;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public UserAccount getUser() {
+        return user;
+    }
+
+    public Article getArticle() {
+        return article;
     }
 }
