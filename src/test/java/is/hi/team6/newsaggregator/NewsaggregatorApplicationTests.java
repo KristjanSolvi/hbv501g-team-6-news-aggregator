@@ -20,12 +20,10 @@ import static org.springframework.security.test.web.servlet.response.SecurityMoc
 import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.unauthenticated;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import org.springframework.transaction.annotation.Transactional;
@@ -688,6 +686,364 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
         return article;
     }
 
-    
+        @Test
+        void ownerCanUpdateOwnArticle() throws Exception {
+                var owner = createAccount();
+                var article = createArticle("Original title", "2026-10-10T12:00:00Z", null, owner);
 
+                mvc.perform(put("/api/articles/{id}", article.getId())
+                                .with(user("reader@example.com").roles("USER"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                        "title": "Updated title",
+                                        "content": "Updated body",
+                                        "url": "https://example.com/updated",
+                                        "category": "Technology",
+                                        "publishedAt": "2026-10-20T12:00:00Z"
+                                        }
+                                        """))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.title").value("Updated title"))
+                        .andExpect(jsonPath("$.content").value("Updated body"))
+                        .andExpect(jsonPath("$.category").value("Technology"))
+                        .andExpect(jsonPath("$.ownerId").value(owner.getId()));
+
+                entities.flush();
+                entities.clear();
+
+                var updated = articles.findById(article.getId()).orElseThrow();
+                assertThat(updated.getTitle()).isEqualTo("Updated title");
+                assertThat(updated.getContent()).isEqualTo("Updated body");
+                assertThat(updated.getCategory()).isEqualTo("Technology");
+        }
+
+        @Test
+        void userCannotUpdateAnotherUsersArticle() throws Exception {
+                var owner = accounts.saveAndFlush(
+                        new UserAccount("owner@example.com", passwords.encode("password123")));
+                var article = createArticle("Original title", "2026-10-10T12:00:00Z", null, owner);
+
+                mvc.perform(put("/api/articles/{id}", article.getId())
+                                .with(user("reader@example.com").roles("USER"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                        "title": "Hacked title",
+                                        "content": "Changed body",
+                                        "category": "Technology",
+                                        "publishedAt": "2026-10-20T12:00:00Z"
+                                        }
+                                        """))
+                        .andExpect(status().isForbidden());
+
+                entities.flush();
+                entities.clear();
+
+                assertThat(articles.findById(article.getId()).orElseThrow().getTitle())
+                        .isEqualTo("Original title");
+        }
+
+        @Test
+        void ownerCannotUpdateUnknownArticle() throws Exception {
+                createAccount();
+
+                mvc.perform(put("/api/articles/{id}", Long.MAX_VALUE)
+                                .with(user("reader@example.com").roles("USER"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                        "title": "Updated title",
+                                        "content": "Body",
+                                        "category": "Science",
+                                        "publishedAt": "2026-10-20T12:00:00Z"
+                                        }
+                                        """))
+                        .andExpect(status().isNotFound());
+        }
+
+        @Test
+        void updateArticleRejectsBlankTitle() throws Exception {
+                var owner = createAccount();
+                var article = createArticle("Original title", "2026-10-10T12:00:00Z", null, owner);
+
+                mvc.perform(put("/api/articles/{id}", article.getId())
+                                .with(user("reader@example.com").roles("USER"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                        "title": "",
+                                        "content": "Updated body",
+                                        "category": "Science",
+                                        "publishedAt": "2026-10-20T12:00:00Z"
+                                        }
+                                        """))
+                        .andExpect(status().isBadRequest());
+
+                assertThat(article.getTitle()).isEqualTo("Original title");
+        }
+
+        @Test
+        void unauthenticatedUserCannotUpdateArticle() throws Exception {
+                var owner = createAccount();
+                var article = createArticle("Original title", "2026-10-10T12:00:00Z", null, owner);
+
+                mvc.perform(put("/api/articles/{id}", article.getId())
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                        "title": "Unauthorized update",
+                                        "content": "Body",
+                                        "category": "Science",
+                                        "publishedAt": "2026-10-20T12:00:00Z"
+                                        }
+                                        """))
+                        .andExpect(status().isUnauthorized());
+
+                assertThat(article.getTitle()).isEqualTo("Original title");
+        }
+
+    
+        @Test
+        void ownerCanDeleteOwnArticle() throws Exception {
+                var owner = createAccount();
+                var article = createArticle("My article", "2026-10-10T12:00:00Z", null, owner);
+                Long articleId = article.getId();
+
+                mvc.perform(delete("/api/articles/{id}", articleId)
+                                .with(user("reader@example.com").roles("USER"))
+                                .with(csrf()))
+                        .andExpect(status().isNoContent());
+
+                entities.flush();
+                entities.clear();
+
+                assertThat(articles.findById(articleId)).isEmpty();
+        }
+
+        @Test
+        void userCannotDeleteAnotherUsersArticle() throws Exception {
+                var owner = accounts.saveAndFlush(
+                        new UserAccount("owner@example.com", passwords.encode("password123")));
+                var article = createArticle("Protected article", "2026-10-10T12:00:00Z", null, owner);
+                Long articleId = article.getId();
+
+                mvc.perform(delete("/api/articles/{id}", articleId)
+                                .with(user("reader@example.com").roles("USER"))
+                                .with(csrf()))
+                        .andExpect(status().isForbidden());
+
+                entities.flush();
+                entities.clear();
+
+                assertThat(articles.findById(articleId)).isPresent();
+        }
+
+        @Test
+        void deletingArticleAlsoRemovesItsFavourites() throws Exception {
+                var owner = createAccount();
+                var article = createArticle("Saved article", "2026-10-10T12:00:00Z", null, owner);
+                Long articleId = article.getId();
+
+                entities.persist(new Favourite(owner, article));
+                entities.flush();
+
+                mvc.perform(delete("/api/articles/{id}", articleId)
+                                .with(user("reader@example.com").roles("USER"))
+                                .with(csrf()))
+                        .andExpect(status().isNoContent());
+
+                entities.flush();
+                entities.clear();
+
+                assertThat(articles.findById(articleId)).isEmpty();
+                assertThat(entities.createQuery(
+                        "select count(f) from Favourite f", Long.class)
+                        .getSingleResult()).isZero();
+        }
+
+        @Test
+        void unauthenticatedUserCannotDeleteArticle() throws Exception {
+                var owner = createAccount();
+                var article = createArticle("Protected article", "2026-10-10T12:00:00Z", null, owner);
+                Long articleId = article.getId();
+
+                mvc.perform(delete("/api/articles/{id}", articleId)
+                                .with(csrf()))
+                        .andExpect(status().isUnauthorized());
+
+                assertThat(articles.findById(articleId)).isPresent();
+        }
+
+        @Test
+        void deletingUnknownArticleReturnsNotFound() throws Exception {
+                mvc.perform(delete("/api/articles/{id}", Long.MAX_VALUE)
+                                .with(user("reader@example.com").roles("USER"))
+                                .with(csrf()))
+                        .andExpect(status().isNotFound());
+        }
+
+        @Test
+        void adminCanUpdateAnotherUsersArticle() throws Exception {
+                var owner = createAccount();
+                var article = createArticle("Original title", "2026-10-10T12:00:00Z", null, owner);
+                Long id = article.getId();
+
+                mvc.perform(put("/api/admin/articles/{id}", id)
+                                .with(user("admin@example.com").roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                        "title": "Admin updated",
+                                        "content": "Updated by administrator",
+                                        "category": "Technology",
+                                        "publishedAt": "2026-10-20T12:00:00Z"
+                                        }
+                                        """))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.title").value("Admin updated"))
+                        .andExpect(jsonPath("$.ownerId").value(owner.getId()));
+
+                entities.flush();
+                entities.clear();
+
+                assertThat(articles.findById(id).orElseThrow().getTitle())
+                        .isEqualTo("Admin updated");
+        }
+
+        @Test
+        void adminCanDeleteAnotherUsersArticle() throws Exception {
+                var owner = createAccount();
+                var article = createArticle("Protected article", "2026-10-10T12:00:00Z", null, owner);
+                Long id = article.getId();
+
+                mvc.perform(delete("/api/admin/articles/{id}", id)
+                                .with(user("admin@example.com").roles("ADMIN"))
+                                .with(csrf()))
+                        .andExpect(status().isNoContent());
+
+                entities.flush();
+                entities.clear();
+
+                assertThat(articles.findById(id)).isEmpty();
+        }
+
+        @Test
+        void regularUserCannotUpdateArticleThroughAdminEndpoint() throws Exception {
+                var owner = createAccount();
+                var article = createArticle("Original title", "2026-10-10T12:00:00Z", null, owner);
+
+                mvc.perform(put("/api/admin/articles/{id}", article.getId())
+                                .with(user("reader@example.com").roles("USER"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                        "title": "Unauthorized change",
+                                        "category": "Science",
+                                        "publishedAt": "2026-10-20T12:00:00Z"
+                                        }
+                                        """))
+                        .andExpect(status().isForbidden());
+
+                assertThat(article.getTitle()).isEqualTo("Original title");
+        }
+
+        @Test
+        void regularUserCannotDeleteArticleThroughAdminEndpoint() throws Exception {
+                var owner = createAccount();
+                var article = createArticle("Protected article", "2026-10-10T12:00:00Z", null, owner);
+
+                mvc.perform(delete("/api/admin/articles/{id}", article.getId())
+                                .with(user("reader@example.com").roles("USER"))
+                                .with(csrf()))
+                        .andExpect(status().isForbidden());
+
+                assertThat(articles.findById(article.getId())).isPresent();
+        }
+
+        @Test
+        void adminCanUpdateArticleWithoutOwner() throws Exception {
+                var article = createArticle("Imported article", "2026-10-10T12:00:00Z", null, null);
+
+                mvc.perform(put("/api/admin/articles/{id}", article.getId())
+                                .with(user("admin@example.com").roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                        "title": "Corrected imported article",
+                                        "category": "News",
+                                        "publishedAt": "2026-10-20T12:00:00Z"
+                                        }
+                                        """))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.title").value("Corrected imported article"))
+                        .andExpect(jsonPath("$.ownerId").isEmpty());
+        }
+
+        @Test
+        void adminCanDeleteArticleWithoutOwner() throws Exception {
+                var article = createArticle("Imported article", "2026-10-10T12:00:00Z", null, null);
+                Long id = article.getId();
+
+                mvc.perform(delete("/api/admin/articles/{id}", id)
+                                .with(user("admin@example.com").roles("ADMIN"))
+                                .with(csrf()))
+                        .andExpect(status().isNoContent());
+
+                entities.flush();
+                entities.clear();
+
+                assertThat(articles.findById(id)).isEmpty();
+        }
+
+        @Test
+        void adminCannotUpdateUnknownArticle() throws Exception {
+                mvc.perform(put("/api/admin/articles/{id}", Long.MAX_VALUE)
+                                .with(user("admin@example.com").roles("ADMIN"))
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                        "title": "Updated",
+                                        "category": "Science",
+                                        "publishedAt": "2026-10-20T12:00:00Z"
+                                        }
+                                        """))
+                        .andExpect(status().isNotFound());
+        }
+
+        @Test
+        void adminCannotDeleteUnknownArticle() throws Exception {
+                mvc.perform(delete("/api/admin/articles/{id}", Long.MAX_VALUE)
+                                .with(user("admin@example.com").roles("ADMIN"))
+                                .with(csrf()))
+                        .andExpect(status().isNotFound());
+        }
+
+        @Test
+        void unauthenticatedUserCannotUseAdminArticleEndpoints() throws Exception {
+                mvc.perform(delete("/api/admin/articles/{id}", 1L)
+                                .with(csrf()))
+                        .andExpect(status().isUnauthorized());
+
+                mvc.perform(put("/api/admin/articles/{id}", 1L)
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                        "title": "Updated",
+                                        "category": "Science",
+                                        "publishedAt": "2026-10-20T12:00:00Z"
+                                        }
+                                        """))
+                        .andExpect(status().isUnauthorized());
+        }
 }

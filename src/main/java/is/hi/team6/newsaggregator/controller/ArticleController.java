@@ -5,9 +5,11 @@ import java.time.Instant;
 
 import org.springframework.data.web.PagedModel;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -18,6 +20,7 @@ import is.hi.team6.newsaggregator.dto.ArticleCreateRequest;
 import is.hi.team6.newsaggregator.dto.ArticleResponse;
 import is.hi.team6.newsaggregator.dto.ArticleSearchCriteria;
 import is.hi.team6.newsaggregator.dto.ArticleSummary;
+import is.hi.team6.newsaggregator.dto.ArticleUpdateRequest;
 import is.hi.team6.newsaggregator.service.ArticleService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -67,5 +70,23 @@ public class ArticleController {
             @Valid @RequestBody ArticleCreateRequest request,
             Principal principal) {
         return articles.createArticle(principal.getName(), request);
+    }
+
+    @PutMapping("/{id}")
+    public ArticleResponse updateOwnArticle(
+            Principal principal,
+            @PathVariable @Min(1) Long id,
+            @Valid @RequestBody ArticleUpdateRequest request) {
+
+        return articles.updateOwnArticle(principal.getName(), id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteOwnArticle(
+            Principal principal,
+            @PathVariable @Min(1) Long id) {
+
+        articles.deleteOwnArticle(principal.getName(), id);
     }
 }

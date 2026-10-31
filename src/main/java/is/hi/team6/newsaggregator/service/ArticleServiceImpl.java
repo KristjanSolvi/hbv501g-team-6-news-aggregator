@@ -13,10 +13,12 @@ import is.hi.team6.newsaggregator.dto.ArticleCreateRequest;
 import is.hi.team6.newsaggregator.dto.ArticleResponse;
 import is.hi.team6.newsaggregator.dto.ArticleSummary;
 import is.hi.team6.newsaggregator.dto.ArticleSearchCriteria;
+import is.hi.team6.newsaggregator.dto.ArticleUpdateRequest;
 import is.hi.team6.newsaggregator.model.Article;
 import is.hi.team6.newsaggregator.repository.ArticleRepository;
 import is.hi.team6.newsaggregator.repository.NewsSourceRepository;
 import is.hi.team6.newsaggregator.repository.UserAccountRepository;
+import is.hi.team6.newsaggregator.repository.FavouriteRepository;
 
 @Service
 public class ArticleServiceImpl implements ArticleService {
@@ -24,11 +26,13 @@ public class ArticleServiceImpl implements ArticleService {
     private final ArticleRepository articles;
     private final UserAccountRepository accounts;
     private final NewsSourceRepository sources;
+    private final FavouriteRepository favourites;
 
-    public ArticleServiceImpl( ArticleRepository articles, UserAccountRepository accounts, NewsSourceRepository sources) {
+    public ArticleServiceImpl( ArticleRepository articles, UserAccountRepository accounts, NewsSourceRepository sources, FavouriteRepository favourites) {
         this.articles = articles;
         this.accounts = accounts;
         this.sources = sources;
+        this.favourites = favourites;
     }
 
     @Override
@@ -124,5 +128,81 @@ public class ArticleServiceImpl implements ArticleService {
         );
 
         return ArticleResponse.from(articles.save(article));
+    }
+
+    @Override
+    @Transactional
+    public ArticleResponse updateOwnArticle(
+            String email,
+            Long id,
+            ArticleUpdateRequest request) {
+
+        var article = articles.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Article not found"));
+
+        var owner = article.getOwner();
+
+        if (owner == null || !owner.getEmail().equalsIgnoreCase(email)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "You can only edit your own articles");
+        }
+
+        article.update(request);
+
+        return ArticleResponse.from(articles.save(article));
+    }
+
+    @Override
+    @Transactional
+    public void deleteOwnArticle(String email, Long id) {
+
+        var article = articles.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Article not found"));
+
+        var owner = article.getOwner();
+
+        if (owner == null || !owner.getEmail().equalsIgnoreCase(email)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "You can only delete your own articles");
+        }
+
+        favourites.deleteByArticle(article);
+        articles.delete(article);
+    }
+
+
+    @Override
+    @Transactional
+    public ArticleResponse updateAnyArticle(
+            Long id,
+            ArticleUpdateRequest request) {
+
+        var article = articles.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Article not found"));
+
+        article.update(request);
+
+        return ArticleResponse.from(articles.save(article));
+    }
+
+    @Override
+    @Transactional
+    public void deleteAnyArticle(Long id) {
+
+        var article = articles.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Article not found"));
+
+        favourites.deleteByArticle(article);
+        articles.delete(article);
     }
 }
