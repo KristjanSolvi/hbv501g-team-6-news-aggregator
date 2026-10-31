@@ -3,6 +3,7 @@ package is.hi.team6.newsaggregator.model;
 import java.time.Instant;
 import java.util.UUID;
 
+import is.hi.team6.newsaggregator.dto.ArticleUpdateRequest;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -88,5 +89,13 @@ public class Article {
 
     public UserAccount getOwner() {
         return owner;
+    }
+
+    public void update(ArticleUpdateRequest request) {
+        this.title = request.title();
+        this.content = request.content();
+        this.url = request.url();
+        this.category = request.category();
+        this.publishedAt = request.publishedAt();
     }
 }
