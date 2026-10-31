@@ -1,10 +1,10 @@
 package is.hi.team6.newsaggregator.service;
 
 import java.util.Locale;
+import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -36,6 +36,18 @@ public class AccountServiceImpl implements AccountService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public AccountResponse getOwnAccount(UUID id) {
+        return AccountResponse.from(findAccount(id));
+    }
+
+    @Override
+    @Transactional
+    public AccountResponse updateOwnAccount(UUID id, UpdateAccountRequest request) {
+        return updateAccount(findAccount(id), request);
+    }
+
+    @Override
     public AccountResponse createAdmin(RegistrationRequest request) {
         var account = new UserAccount(normalizeEmail(request.email()), passwords.encode(request.password()));
         account.changeRole(UserAccount.Role.ADMIN);
@@ -44,22 +56,28 @@ public class AccountServiceImpl implements AccountService {
 
     @Override
     @Transactional
-    public AccountResponse updateOtherAccount(Long id, UpdateAccountRequest request) {
-        var account = accounts.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
-        account.changeEmail(normalizeEmail(request.email()));
-        if (request.password() != null) {
-            account.changePasswordHash(passwords.encode(request.password()));
-        }
-        return saveAccount(account);
+    public AccountResponse updateOtherAccount(UUID id, UpdateAccountRequest request) {
+        return updateAccount(findAccount(id), request);
     }
 
     @Override
     public UserDetails loadUserByUsername(String email) {
         var account = accounts.findByEmail(normalizeEmail(email))
                 .orElseThrow(() -> new UsernameNotFoundException("Invalid email or password"));
-        return User.withUsername(account.getEmail())
-                .password(account.getPasswordHash()).roles(account.getRole().name()).build();
+        return new AccountUserDetails(account.getId(), account.getEmail(), account.getPasswordHash(), account.getRole());
+    }
+
+    private UserAccount findAccount(UUID id) {
+        return accounts.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
+    }
+
+    private AccountResponse updateAccount(UserAccount account, UpdateAccountRequest request) {
+        account.changeEmail(normalizeEmail(request.email()));
+        if (request.password() != null) {
+            account.changePasswordHash(passwords.encode(request.password()));
+        }
+        return saveAccount(account);
     }
 
     private AccountResponse saveAccount(UserAccount account) {

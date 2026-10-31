@@ -2,6 +2,7 @@
 package is.hi.team6.newsaggregator.dto;
 
 import java.time.Instant;
+import java.util.UUID;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -24,6 +25,6 @@ public record ArticleCreateRequest(
         @NotNull
         Instant publishedAt,
 
-        Long sourceId
+        UUID sourceId
 
 ) {}

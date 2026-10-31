@@ -1,13 +1,16 @@
 package is.hi.team6.newsaggregator.controller;
 
-import java.security.Principal;
 import java.time.Instant;
+import java.util.UUID;
 
 import org.springframework.data.web.PagedModel;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -18,7 +21,9 @@ import is.hi.team6.newsaggregator.dto.ArticleCreateRequest;
 import is.hi.team6.newsaggregator.dto.ArticleResponse;
 import is.hi.team6.newsaggregator.dto.ArticleSearchCriteria;
 import is.hi.team6.newsaggregator.dto.ArticleSummary;
+import is.hi.team6.newsaggregator.dto.ArticleUpdateRequest;
 import is.hi.team6.newsaggregator.service.ArticleService;
+import is.hi.team6.newsaggregator.service.AccountUserDetails;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -43,7 +48,7 @@ public class ArticleController {
     @GetMapping("/search")
     public PagedModel<ArticleSummary> search(
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Long sourceId,
+            @RequestParam(required = false) UUID sourceId,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) Instant from,
             @RequestParam(required = false) Instant to,
@@ -57,7 +62,7 @@ public class ArticleController {
     }
 
     @GetMapping("/{id}")
-    public ArticleResponse getArticle(@PathVariable @Min(1) Long id) {
+    public ArticleResponse getArticle(@PathVariable UUID id) {
         return articles.getArticle(id);
     }
 
@@ -65,7 +70,25 @@ public class ArticleController {
     @ResponseStatus(HttpStatus.CREATED)
     public ArticleResponse createArticle(
             @Valid @RequestBody ArticleCreateRequest request,
-            Principal principal) {
-        return articles.createArticle(principal.getName(), request);
+            @AuthenticationPrincipal AccountUserDetails principal) {
+        return articles.createArticle(principal.getAccountId(), request);
+    }
+
+    @PutMapping("/{id}")
+    public ArticleResponse updateOwnArticle(
+            @AuthenticationPrincipal AccountUserDetails principal,
+            @PathVariable UUID id,
+            @Valid @RequestBody ArticleUpdateRequest request) {
+
+        return articles.updateOwnArticle(principal.getAccountId(), id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteOwnArticle(
+            @AuthenticationPrincipal AccountUserDetails principal,
+            @PathVariable UUID id) {
+
+        articles.deleteOwnArticle(principal.getAccountId(), id);
     }
 }

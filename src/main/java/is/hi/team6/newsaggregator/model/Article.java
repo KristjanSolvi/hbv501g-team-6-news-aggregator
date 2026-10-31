@@ -1,7 +1,9 @@
 package is.hi.team6.newsaggregator.model;
 
 import java.time.Instant;
+import java.util.UUID;
 
+import is.hi.team6.newsaggregator.dto.ArticleUpdateRequest;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -18,8 +20,8 @@ import jakarta.persistence.Table;
 public class Article {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     @Column(nullable = false)
     private String title;
@@ -57,7 +59,7 @@ public class Article {
         this.owner = owner;
     }
 
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
@@ -87,5 +89,13 @@ public class Article {
 
     public UserAccount getOwner() {
         return owner;
+    }
+
+    public void update(ArticleUpdateRequest request) {
+        this.title = request.title();
+        this.content = request.content();
+        this.url = request.url();
+        this.category = request.category();
+        this.publishedAt = request.publishedAt();
     }
 }

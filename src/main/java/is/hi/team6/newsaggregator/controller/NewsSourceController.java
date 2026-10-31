@@ -1,6 +1,7 @@
 package is.hi.team6.newsaggregator.controller;
 
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,14 +42,14 @@ public class NewsSourceController {
 
     @PutMapping ("/{id}")
     @ResponseStatus(HttpStatus.OK)
-    public NewsSourceResponse updateSource(@Valid @PathVariable Long id,
+    public NewsSourceResponse updateSource(@Valid @PathVariable UUID id,
         @RequestBody  NewsSourceRequest request){
         return sources.updateSource(id, request);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteSource(@PathVariable Long id){
+    public void deleteSource(@PathVariable UUID id){
         sources.deleteSource(id);
     }
 }

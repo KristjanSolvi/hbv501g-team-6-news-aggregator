@@ -1,5 +1,7 @@
 package is.hi.team6.newsaggregator;
 
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -59,7 +61,7 @@ class AdminAccountTests {
                                 {"email":"NewAdmin@Example.com","password":"admin-password123","role":"USER"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.id").isString())
                 .andExpect(jsonPath("$.email").value("newadmin@example.com"))
                 .andExpect(jsonPath("$.role").value("ADMIN"))
                 .andExpect(jsonPath("$.password").doesNotExist())
@@ -155,7 +157,7 @@ class AdminAccountTests {
                                 {"email":"Updated@Example.com","password":"new-password123","role":"ADMIN"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(account.getId()))
+                .andExpect(jsonPath("$.id").value(account.getId().toString()))
                 .andExpect(jsonPath("$.email").value("updated@example.com"))
                 .andExpect(jsonPath("$.role").value("USER"))
                 .andExpect(jsonPath("$.password").doesNotExist())
@@ -242,7 +244,7 @@ class AdminAccountTests {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"0", "-1", "abc", "1.5", "9223372036854775808"})
+    @ValueSource(strings = {"0", "1", "-1", "abc", "1.5", "9223372036854775808"})
     void invalidAccountIdentifiersAreRejected(String id) throws Exception {
         mvc.perform(put("/api/admin/accounts/{id}", id).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -255,7 +257,7 @@ class AdminAccountTests {
 
     @Test
     void unknownAccountReturnsNotFound() throws Exception {
-        mvc.perform(put("/api/admin/accounts/{id}", Long.MAX_VALUE).with(csrf())
+        mvc.perform(put("/api/admin/accounts/{id}", UUID.randomUUID()).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"email":"changed@example.com"}
