@@ -1,5 +1,7 @@
 package is.hi.team6.newsaggregator.service;
 
+import java.util.UUID;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -90,7 +92,7 @@ public class ArticleServiceImpl implements ArticleService {
 
     @Override
     @Transactional(readOnly = true)
-    public ArticleResponse getArticle(Long id) {
+    public ArticleResponse getArticle(UUID id) {
         var article = articles.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Article not found"));
         return ArticleResponse.from(article);
@@ -98,8 +100,8 @@ public class ArticleServiceImpl implements ArticleService {
 
     @Override
     @Transactional
-    public ArticleResponse createArticle(String email, ArticleCreateRequest request) {
-        var owner = accounts.findByEmail(email)
+    public ArticleResponse createArticle(UUID accountId, ArticleCreateRequest request) {
+        var owner = accounts.findById(accountId)
                 .orElseThrow(() ->
                         new ResponseStatusException(
                                 HttpStatus.UNAUTHORIZED,

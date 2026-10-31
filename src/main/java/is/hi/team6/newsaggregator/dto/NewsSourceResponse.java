@@ -1,9 +1,11 @@
 package is.hi.team6.newsaggregator.dto;
 
+import java.util.UUID;
+
 import is.hi.team6.newsaggregator.model.NewsSource;
 
 public record NewsSourceResponse(
-    Long id,
+    UUID id,
     String name,
     String url
 ) 

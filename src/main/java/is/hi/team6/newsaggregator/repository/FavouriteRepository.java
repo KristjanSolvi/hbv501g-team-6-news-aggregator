@@ -1,6 +1,7 @@
 package is.hi.team6.newsaggregator.repository;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -11,7 +12,7 @@ import is.hi.team6.newsaggregator.model.Article;
 import is.hi.team6.newsaggregator.model.Favourite;
 import is.hi.team6.newsaggregator.model.UserAccount;
 
-public interface FavouriteRepository extends JpaRepository<Favourite, Long> {
+public interface FavouriteRepository extends JpaRepository<Favourite, UUID> {
 
     boolean existsByUserAndArticle(
             UserAccount user,

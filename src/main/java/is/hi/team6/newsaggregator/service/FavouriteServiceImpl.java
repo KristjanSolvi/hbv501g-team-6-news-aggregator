@@ -1,5 +1,7 @@
 package is.hi.team6.newsaggregator.service;
 
+import java.util.UUID;
+
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -34,10 +36,10 @@ public class FavouriteServiceImpl implements FavouriteService {
     @Override
     @Transactional
     public ArticleSummary saveFavourite(
-            String email,
-            Long articleId) {
+            UUID accountId,
+            UUID articleId) {
 
-        var user = accounts.findByEmail(email)
+        var user = accounts.findById(accountId)
                 .orElseThrow(() ->
                         new ResponseStatusException(
                                 HttpStatus.NOT_FOUND,
@@ -75,11 +77,11 @@ public class FavouriteServiceImpl implements FavouriteService {
     @Override
     @Transactional(readOnly = true)
     public Page<ArticleSummary> getFavourites(
-            String email,
+            UUID accountId,
             int page,
             int size) {
 
-        var user = accounts.findByEmail(email)
+        var user = accounts.findById(accountId)
                 .orElseThrow(() ->
                         new ResponseStatusException(
                                 HttpStatus.NOT_FOUND,
@@ -91,7 +93,7 @@ public class FavouriteServiceImpl implements FavouriteService {
                 size,
                 Sort.by(
                         Sort.Direction.DESC,
-                        "id"
+                        "savedAt", "id"
                 )
         );
 

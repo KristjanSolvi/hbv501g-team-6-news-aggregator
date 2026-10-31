@@ -7,8 +7,7 @@ A Java Spring Boot backend for HBV501G Software Project 1.
 - Week 1: domain entities, database relationships, and controller/service/repository layers.
 - Week 2: UC1 View News Feed, UC4 Register Account, and UC5 Log In.
 
-UC2 View Article, UC6 View Account, UC7 Modify Account, and UC18 Manage User Accounts
-are also implemented.
+UC2, UC6, UC7, UC9, UC10 and UC18 are also implemented.
 
 ## Run
 
@@ -19,7 +18,8 @@ Run these commands from `website`:
 ./mvnw spring-boot:run
 ```
 
-The API runs at `http://localhost:8080`. H2 stores data in `data/`, which Git ignores.
+The API runs at `http://localhost:8080`. H2 stores data in `data/newsaggregator-uuid.mv.db`.
+The old numeric-ID database is left untouched; its data is not migrated automatically.
 Data survives restarts; the initial feed is empty. No separate database installation is needed.
 
 For three fictional sample articles, use the optional demo profile:
@@ -35,9 +35,8 @@ Demo mode uses a separate, temporary database that resets on restart.
 ```
 
 Tests use their own in-memory database and cover registration, login sessions, CSRF,
-pagination, article retrieval, source relationships, duplicate favourites, own-account viewing
-and updates, and administrator account management, including authorization and rollback on
-conflicting emails.
+pagination, article retrieval, source relationships, duplicate favourites, and administrator
+account creation and updates, including authorization and rollback on conflicting emails.
 
 ## API
 
@@ -48,10 +47,14 @@ conflicting emails.
 | GET | `/api/auth/csrf` | Obtain a token for POST and PUT requests |
 | POST | `/api/auth/register` | Register with JSON fields `email` and `password` |
 | POST | `/api/auth/login` | Log in with form fields `email` and `password` |
-| GET | `/api/accounts/me` | View the logged-in user's own account |
-| PUT | `/api/accounts/me` | Update the logged-in user's own email and optional password |
+| GET | `/api/accounts/me` | View own account |
+| PUT | `/api/accounts/me` | Update own email and optional password |
+| POST | `/api/favourites/{articleId}` | Save a favourite |
+| GET | `/api/favourites?page=0&size=20` | List own favourites |
 | POST | `/api/admin/accounts` | Administrator creates a new administrator account |
 | PUT | `/api/admin/accounts/{id}` | Administrator updates an existing account |
+
+All account, article, source and favourite IDs are UUIDs, returned as strings.
 
 The feed starts at page 0, accepts sizes from 1 to 100, and sorts newest first.
 Article IDs break ties when publication times match. Responses contain `content` (articles)
@@ -60,7 +63,7 @@ source when available. Empty feeds and pages past the end return HTTP 200 with e
 Invalid pagination returns 400.
 
 Article details include the full content, source information when available, and the owner ID
-when present. The identifier must be a positive integer; invalid identifiers return 400 and
+when present. The identifier must be a UUID; invalid identifiers return 400 and
 unknown articles return 404. Reading an article does not require login.
 
 Registration returns 201 with the account's ID, email, and `USER` role. Emails are
@@ -73,28 +76,14 @@ Invalid credentials return 401. Keep the cookie for subsequent requests; session
 after 30 minutes of inactivity. CSRF tokens protect POST and PUT requests against requests forged
 by other websites. Missing or invalid tokens return 403. Fetch a new token after login.
 
-Viewing your account requires a login session and returns your ID, email, and role. The account
-is selected from the account ID stored at login, not a supplied ID or email. Passwords and hashes are
-never returned. Unauthenticated requests return 401; a missing account returns 404.
-
-Updating your own account requires a login session and a CSRF token. Send JSON with a required
-`email` and optional `password`, using the same validation rules as administrator updates below.
-The account is selected from the session; a supplied ID or role cannot change the target or
-grant administrator access. Success returns 200 with your ID, normalized email, and unchanged
-role. The current session is updated when your email changes, so you remain logged in. Future
-logins use the new credentials. Both account endpoints use the stable account ID, so other
-sessions still access the same account if its old email is reused. Invalid input returns 400,
-missing accounts return 404, and duplicate emails return 409 without changing either the email
-or password.
-
 Administrator account creation requires an existing administrator session and a CSRF token.
 Send JSON with `email` and `password`, using the same validation rules as registration.
 Success returns 201 with the new account's ID, normalized email, and `ADMIN` role. Duplicate
 emails return 409; invalid input returns 400. Public registration still creates only `USER`
 accounts. The new administrator can log in through the existing login endpoint.
 
-Administrator account updates require an administrator session and a CSRF token. Send JSON
-with a required `email` and an optional `password`; omitting the password or sending `null` preserves the
+Administrator account updates require an administrator session and a CSRF token. Send JSON with a required
+`email` and an optional `password`; omitting the password or sending `null` preserves the
 existing password. A supplied password follows the registration rules. Successful updates
 return 200 with the account's ID, normalized email, and unchanged role. Invalid input returns
 400, unknown accounts return 404, and duplicate emails return 409 without changing the account.
@@ -102,11 +91,11 @@ Unauthenticated requests with a valid CSRF token return 401; regular users recei
 
 ### Try it with curl
 
-These examples use Python 3 to read the CSRF token from JSON:
+These examples use Python 3 to read the CSRF token from JSON. Use an article UUID from your feed:
 
 ```sh
 curl 'http://localhost:8080/api/articles?page=0&size=2'
-curl 'http://localhost:8080/api/articles/1'
+curl 'http://localhost:8080/api/articles/9491db8b-175a-4920-9ee8-d3fb454398c0'
 
 cookies=$(mktemp)
 token=$(curl -s -c "$cookies" http://localhost:8080/api/auth/csrf |
@@ -144,8 +133,7 @@ All Java packages are under `src/main/java/is/hi/team6/newsaggregator`:
 Start reading with `ArticleController` → `ArticleServiceImpl` → `ArticleRepository`, then
 `AuthController` / `AdminAccountController` → `AccountServiceImpl` → `SecurityConfig`.
 
-Source, ownership, and favourite relationships are the week 1 database foundation;
-their management endpoints belong to later weeks. Authentication currently uses sessions.
+Authentication currently uses sessions.
 The team's JWT decision can be revisited with the later security material.
 
 Implementation references: [Spring Security form login](https://docs.spring.io/spring-security/reference/servlet/authentication/passwords/form.html)

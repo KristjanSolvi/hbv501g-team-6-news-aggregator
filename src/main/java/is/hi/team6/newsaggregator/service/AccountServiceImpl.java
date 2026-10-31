@@ -1,6 +1,7 @@
 package is.hi.team6.newsaggregator.service;
 
 import java.util.Locale;
+import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -36,13 +37,13 @@ public class AccountServiceImpl implements AccountService {
 
     @Override
     @Transactional(readOnly = true)
-    public AccountResponse getOwnAccount(Long id) {
+    public AccountResponse getOwnAccount(UUID id) {
         return AccountResponse.from(findAccount(id));
     }
 
     @Override
     @Transactional
-    public AccountResponse updateOwnAccount(Long id, UpdateAccountRequest request) {
+    public AccountResponse updateOwnAccount(UUID id, UpdateAccountRequest request) {
         return updateAccount(findAccount(id), request);
     }
 
@@ -55,7 +56,7 @@ public class AccountServiceImpl implements AccountService {
 
     @Override
     @Transactional
-    public AccountResponse updateOtherAccount(Long id, UpdateAccountRequest request) {
+    public AccountResponse updateOtherAccount(UUID id, UpdateAccountRequest request) {
         return updateAccount(findAccount(id), request);
     }
 
@@ -66,7 +67,7 @@ public class AccountServiceImpl implements AccountService {
         return new AccountUserDetails(account.getId(), account.getEmail(), account.getPasswordHash(), account.getRole());
     }
 
-    private UserAccount findAccount(Long id) {
+    private UserAccount findAccount(UUID id) {
         return accounts.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
     }

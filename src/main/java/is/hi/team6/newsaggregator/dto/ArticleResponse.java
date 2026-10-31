@@ -2,18 +2,19 @@
 package is.hi.team6.newsaggregator.dto;
 
 import java.time.Instant;
+import java.util.UUID;
 
 import is.hi.team6.newsaggregator.model.Article;
 
 public record ArticleResponse(
-        Long id,
+        UUID id,
         String title,
         String content,
         String category,
         Instant publishedAt,
         String url,
         ArticleSummary.SourceSummary source,
-        Long ownerId
+        UUID ownerId
 ) {
 
     public static ArticleResponse from(Article article) {

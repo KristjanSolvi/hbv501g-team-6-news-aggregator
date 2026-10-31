@@ -1,4 +1,6 @@
 package is.hi.team6.newsaggregator.service;
+
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -40,7 +42,7 @@ public class NewsSourceServiceImpl implements NewsSourceService {
     };
 
     @Override 
-    public NewsSourceResponse updateSource(Long id, NewsSourceRequest request){
+    public NewsSourceResponse updateSource(UUID id, NewsSourceRequest request){
         Optional<NewsSource> maybeSource = repository.findById(id);
         NewsSource source;
         if (maybeSource.isEmpty()) {
@@ -58,7 +60,7 @@ public class NewsSourceServiceImpl implements NewsSourceService {
     };
 
     @Override 
-    public void deleteSource(Long id){
+    public void deleteSource(UUID id){
         if (id == null) {
             return;
         }
@@ -66,7 +68,7 @@ public class NewsSourceServiceImpl implements NewsSourceService {
     };
 
     @Override 
-    public NewsSource getSource(Long id){
+    public NewsSource getSource(UUID id){
         Optional<NewsSource> temp = repository.findById(id);
         if (temp.isEmpty()) { //if the source doesnt exist returns null? kannski að skila tómum seinna?
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing request id");

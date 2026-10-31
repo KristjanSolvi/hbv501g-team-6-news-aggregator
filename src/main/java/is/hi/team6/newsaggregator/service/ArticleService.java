@@ -1,5 +1,7 @@
 package is.hi.team6.newsaggregator.service;
 
+import java.util.UUID;
+
 import org.springframework.data.domain.Page;
 
 import is.hi.team6.newsaggregator.dto.ArticleCreateRequest;
@@ -12,7 +14,7 @@ public interface ArticleService {
     Page<ArticleSummary> getFeed(int page, int size);
     Page<ArticleSummary> search(ArticleSearchCriteria criteria, int page, int size);
 
-    ArticleResponse getArticle(Long id);
+    ArticleResponse getArticle(UUID id);
 
-    ArticleResponse createArticle(String email, ArticleCreateRequest request);
+    ArticleResponse createArticle(UUID accountId, ArticleCreateRequest request);
 }

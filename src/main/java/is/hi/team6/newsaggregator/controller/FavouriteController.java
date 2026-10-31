@@ -1,9 +1,10 @@
 package is.hi.team6.newsaggregator.controller;
 
-import java.security.Principal;
+import java.util.UUID;
 
 import org.springframework.data.web.PagedModel;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import is.hi.team6.newsaggregator.dto.ArticleSummary;
 import is.hi.team6.newsaggregator.service.FavouriteService;
+import is.hi.team6.newsaggregator.service.AccountUserDetails;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
@@ -31,11 +33,11 @@ public class FavouriteController {
     @PostMapping("/{articleId}")
     @ResponseStatus(HttpStatus.CREATED)
     public ArticleSummary saveFavourite(
-            @PathVariable @Min(1) Long articleId,
-            Principal principal) {
+            @PathVariable UUID articleId,
+            @AuthenticationPrincipal AccountUserDetails principal) {
 
         return favourites.saveFavourite(
-                principal.getName(),
+                principal.getAccountId(),
                 articleId
         );
     }
@@ -51,11 +53,11 @@ public class FavouriteController {
             @Max(100)
             int size,
 
-            Principal principal) {
+            @AuthenticationPrincipal AccountUserDetails principal) {
 
         return new PagedModel<>(
                 favourites.getFavourites(
-                        principal.getName(),
+                        principal.getAccountId(),
                         page,
                         size
                 )

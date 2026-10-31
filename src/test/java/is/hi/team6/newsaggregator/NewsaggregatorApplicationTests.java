@@ -1,5 +1,7 @@
 package is.hi.team6.newsaggregator;
 
+import java.util.UUID;
+
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,6 +40,7 @@ import is.hi.team6.newsaggregator.model.UserAccount;
 import is.hi.team6.newsaggregator.repository.ArticleRepository;
 import is.hi.team6.newsaggregator.repository.NewsSourceRepository;
 import is.hi.team6.newsaggregator.repository.UserAccountRepository;
+import is.hi.team6.newsaggregator.service.AccountService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceException;
 import tools.jackson.databind.json.JsonMapper;
@@ -54,6 +57,7 @@ class NewsaggregatorApplicationTests {
     @Autowired EntityManager entities;
     @Autowired NewsSourceRepository sources;
     @Autowired ArticleRepository articles;
+    @Autowired AccountService accountService;
 
     @Test
     void registrationStoresOnlyAPasswordHashAndCannotCreateAnAdmin() throws Exception {
@@ -180,14 +184,17 @@ class NewsaggregatorApplicationTests {
 
     @Test
     void equalPublicationDatesHaveAStableOrderAndSourceIsOptional() throws Exception {
-        createArticle("First", "2026-09-01T12:00:00Z", null, null);
-        createArticle("Second", "2026-09-01T12:00:00Z", null, null);
+        var first = createArticle("First", "2026-09-01T12:00:00Z", null, null);
+        var second = createArticle("Second", "2026-09-01T12:00:00Z", null, null);
 
-        mvc.perform(get("/api/articles"))
+        var response = mvc.perform(get("/api/articles"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].title").value("Second"))
-                .andExpect(jsonPath("$.content[1].title").value("First"))
-                .andExpect(jsonPath("$.content[0].source").isEmpty());
+                .andExpect(jsonPath("$.content[*].id").value(org.hamcrest.Matchers.containsInAnyOrder(
+                        first.getId().toString(), second.getId().toString())))
+                .andExpect(jsonPath("$.content[0].source").isEmpty())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(mvc.perform(get("/api/articles")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).isEqualTo(response);
     }
 
     @Test
@@ -201,16 +208,16 @@ class NewsaggregatorApplicationTests {
 
         mvc.perform(get("/api/articles/{id}", article.getId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(article.getId()))
+                .andExpect(jsonPath("$.id").value(article.getId().toString()))
                 .andExpect(jsonPath("$.title").value("Full article"))
                 .andExpect(jsonPath("$.content").value("Article body"))
                 .andExpect(jsonPath("$.category").value("Science"))
                 .andExpect(jsonPath("$.publishedAt").value("2026-09-01T12:00:00Z"))
                 .andExpect(jsonPath("$.url").value("https://example.com/article"))
-                .andExpect(jsonPath("$.source.id").value(source.getId()))
+                .andExpect(jsonPath("$.source.id").value(source.getId().toString()))
                 .andExpect(jsonPath("$.source.name").value("Example News"))
                 .andExpect(jsonPath("$.source.url").value("https://example.com"))
-                .andExpect(jsonPath("$.ownerId").value(owner.getId()))
+                .andExpect(jsonPath("$.ownerId").value(owner.getId().toString()))
                 .andExpect(jsonPath("$.owner").doesNotExist())
                 .andExpect(jsonPath("$.passwordHash").doesNotExist());
 
@@ -232,14 +239,14 @@ class NewsaggregatorApplicationTests {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"0", "-1", "abc", "1.5", "9223372036854775808"})
+    @ValueSource(strings = {"0", "1", "-1", "abc", "1.5", "9223372036854775808"})
     void invalidArticleIdentifiersAreRejected(String id) throws Exception {
         mvc.perform(get("/api/articles/{id}", id)).andExpect(status().isBadRequest());
     }
 
     @Test
     void unknownArticleReturnsNotFound() throws Exception {
-        mvc.perform(get("/api/articles/{id}", Long.MAX_VALUE))
+        mvc.perform(get("/api/articles/{id}", UUID.randomUUID()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.detail").value("Article not found"));
     }
@@ -272,11 +279,37 @@ class NewsaggregatorApplicationTests {
     }
 
     @Test
+    void identifiersAreRandomUuidsAndRelationshipsSurviveReloading() {
+        var source = sources.saveAndFlush(new NewsSource("UUID source", "https://example.com"));
+        var account = createAccount();
+        var article = createArticle("UUID article", "2026-10-01T12:00:00Z", source, account);
+        var favourite = new Favourite(account, article);
+        entities.persist(favourite);
+        entities.flush();
+        entities.clear();
+
+        var ids = java.util.List.of(source.getId(), account.getId(), article.getId(), favourite.getId());
+        assertThat(ids).doesNotHaveDuplicates();
+        for (var id : ids) {
+            assertThat(id.version()).isEqualTo(4);
+            assertThat(id.variant()).isEqualTo(2);
+        }
+        var saved = entities.find(Favourite.class, favourite.getId());
+        assertThat(saved.getUser().getId()).isEqualTo(account.getId());
+        assertThat(saved.getArticle().getId()).isEqualTo(article.getId());
+        assertThat(saved.getArticle().getSource().getId()).isEqualTo(source.getId());
+        assertThat(saved.getArticle().getOwner().getId()).isEqualTo(account.getId());
+    }
+
+    @Test
     void databasePreventsDuplicateFavourites() {
         var user = createAccount();
         var article = createArticle("Saved article", "2026-09-01T12:00:00Z", null, user);
         entities.persist(new Favourite(user, article));
-        assertThatThrownBy(() -> entities.persist(new Favourite(user, article)))
+        assertThatThrownBy(() -> {
+            entities.persist(new Favourite(user, article));
+            entities.flush();
+        })
                 .isInstanceOf(PersistenceException.class);
     }
 
@@ -287,7 +320,7 @@ void adminCanImportArticlesFromApprovedSource() throws Exception {
 
     String request = """
             {
-              "sourceId": %d,
+              "sourceId": "%s",
               "articles": [
                 {
                   "title": "Imported article",
@@ -307,7 +340,7 @@ void adminCanImportArticlesFromApprovedSource() throws Exception {
                     .content(request))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$[0].title").value("Imported article"))
-            .andExpect(jsonPath("$[0].source.id").value(source.getId()))
+            .andExpect(jsonPath("$[0].source.id").value(source.getId().toString()))
             .andExpect(jsonPath("$[0].source.name").value("Example News"));
 
     assertThat(articles.count()).isEqualTo(1);
@@ -321,7 +354,7 @@ void regularUserCannotImportArticles() throws Exception {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                             {
-                              "sourceId": 1,
+                              "sourceId": "9491db8b-175a-4920-9ee8-d3fb454398c0",
                               "articles": [
                                 {
                                   "title": "Article",
@@ -342,7 +375,7 @@ void importRejectsUnknownNewsSource() throws Exception {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                             {
-                              "sourceId": 999999,
+                              "sourceId": "9491db8b-175a-4920-9ee8-d3fb454398c0",
                               "articles": [
                                 {
                                   "title": "Article",
@@ -363,7 +396,7 @@ void importRejectsEmptyArticleList() throws Exception {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                             {
-                              "sourceId": 1,
+                              "sourceId": "9491db8b-175a-4920-9ee8-d3fb454398c0",
                               "articles": []
                             }
                             """))
@@ -377,7 +410,7 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                             {
-                              "sourceId": 1,
+                              "sourceId": "9491db8b-175a-4920-9ee8-d3fb454398c0",
                               "articles": [
                                 {
                                   "title": "Imported article",
@@ -399,7 +432,7 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
         var account = createAccount();
 
         mvc.perform(post("/api/articles")
-                        .with(user("reader@example.com").roles("USER"))
+                        .with(user(accountService.loadUserByUsername("reader@example.com")))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -415,7 +448,7 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
                 .andExpect(jsonPath("$.title").value("My first article"))
                 .andExpect(jsonPath("$.content").value("This is the article body"))
                 .andExpect(jsonPath("$.category").value("Technology"))
-                .andExpect(jsonPath("$.ownerId").value(account.getId()))
+                .andExpect(jsonPath("$.ownerId").value(account.getId().toString()))
                 .andExpect(jsonPath("$.source").value(
                         org.hamcrest.Matchers.nullValue()));
 
@@ -436,20 +469,20 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
                 "url": "https://example.com/article",
                 "category": "Science",
                 "publishedAt": "2026-10-10T12:00:00Z",
-                "sourceId": %d
+                "sourceId": "%s"
                 }
                 """.formatted(source.getId());
 
         mvc.perform(post("/api/articles")
-                        .with(user("reader@example.com").roles("USER"))
+                        .with(user(accountService.loadUserByUsername("reader@example.com")))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.title").value("Article with source"))
-                .andExpect(jsonPath("$.source.id").value(source.getId()))
+                .andExpect(jsonPath("$.source.id").value(source.getId().toString()))
                 .andExpect(jsonPath("$.source.name").value("Example News"))
-                .andExpect(jsonPath("$.ownerId").value(account.getId()));
+                .andExpect(jsonPath("$.ownerId").value(account.getId().toString()));
 
         assertThat(articles.count()).isEqualTo(1);
         }
@@ -460,7 +493,7 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
         createAccount();
 
         mvc.perform(post("/api/articles")
-                        .with(user("reader@example.com").roles("USER"))
+                        .with(user(accountService.loadUserByUsername("reader@example.com")))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -469,7 +502,7 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
                                 "content": "Article body",
                                 "category": "Science",
                                 "publishedAt": "2026-10-10T12:00:00Z",
-                                "sourceId": 999999
+                                "sourceId": "9491db8b-175a-4920-9ee8-d3fb454398c0"
                                 }
                                 """))
                 .andExpect(status().isNotFound());
@@ -609,7 +642,7 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
 
         @Test 
         void updateSources() throws Exception{
-                Long id;
+                UUID id;
                 mvc.perform(post("/api/admin/newssources/create")
                         .with(user("admin@example.com").roles("ADMIN"))
                         .with(csrf())
@@ -627,7 +660,7 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
                         .andReturn();
                 var jsonMapper = JsonMapper.builder().build();
                 var json = jsonMapper.readTree(response.getResponse().getContentAsString());
-                id = json.get(0).get("id").longValue();
+                id = UUID.fromString(json.get(0).get("id").asString());
                 mvc.perform(put("/api/admin/newssources/"+id.toString())
                         .with(user("admin@example.com").roles("ADMIN"))
                         .with(csrf())
@@ -647,7 +680,7 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
         
         @Test 
         void deleteSource() throws Exception{
-                Long id;
+                UUID id;
                 mvc.perform(post("/api/admin/newssources/create")
                         .with(user("admin@example.com").roles("ADMIN"))
                         .with(csrf())
@@ -665,7 +698,7 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
                         .andReturn();
                 var jsonMapper = JsonMapper.builder().build();
                 var json = jsonMapper.readTree(response.getResponse().getContentAsString());
-                id = json.get(0).get("id").longValue();
+                id = UUID.fromString(json.get(0).get("id").asString());
                 mvc.perform(delete("/api/admin/newssources/"+id.toString())
                         .with(user("admin@example.com").roles("ADMIN"))
                         .with(csrf()))
@@ -673,7 +706,7 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
                 mvc.perform(get("/api/admin/newssources/sources")
                         .with(user("admin@example.com").roles("ADMIN"))
                         .with(csrf())).andExpect(status().isOk())
-                        .andExpect(jsonPath("$[?(@.id == " + id + ")]")
+                        .andExpect(jsonPath("$[?(@.id == '" + id + "')]")
                         .doesNotExist());     
 }
 
