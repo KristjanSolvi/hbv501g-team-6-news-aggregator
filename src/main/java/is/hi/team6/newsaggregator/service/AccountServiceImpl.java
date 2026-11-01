@@ -93,9 +93,13 @@ public class AccountServiceImpl implements AccountService {
     @Transactional 
     public void deleteOwnAccount(String email){
         Optional<UserAccount> account = accounts.findByEmail(email);
-        if (account.isPresent()) {
-            accounts.delete(account.get());
-            };
+        if (account.isEmpty()) {
+            throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Missing User Account");         
+        };
+        accounts.delete(account.get());
+        
     }
 
     private String normalizeEmail(String email) {
