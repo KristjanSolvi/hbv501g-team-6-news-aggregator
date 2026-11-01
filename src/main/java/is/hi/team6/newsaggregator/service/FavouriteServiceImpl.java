@@ -1,12 +1,14 @@
 package is.hi.team6.newsaggregator.service;
 
 import java.util.UUID;
+import java.util.Optional;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -16,6 +18,8 @@ import is.hi.team6.newsaggregator.model.Favourite;
 import is.hi.team6.newsaggregator.repository.ArticleRepository;
 import is.hi.team6.newsaggregator.repository.FavouriteRepository;
 import is.hi.team6.newsaggregator.repository.UserAccountRepository;
+import is.hi.team6.newsaggregator.model.UserAccount;
+import is.hi.team6.newsaggregator.model.Article;
 
 @Service
 public class FavouriteServiceImpl implements FavouriteService {
@@ -102,5 +106,16 @@ public class FavouriteServiceImpl implements FavouriteService {
                         ArticleSummary.from(
                                 favourite.getArticle()
                         ));
+    }
+
+    @Override 
+    @Transactional 
+    public void deleteFavorite(UUID accountId, UUID articleId) {
+        Optional<UserAccount> account = accounts.findById(accountId);
+        Optional<Article> article = articles.findById(articleId);
+        if(account.isEmpty() || article.isEmpty()){
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Malformed User Email");
+        }
+        favourites.deleteByUserAndArticle(account.get(), article.get());
     }
 }

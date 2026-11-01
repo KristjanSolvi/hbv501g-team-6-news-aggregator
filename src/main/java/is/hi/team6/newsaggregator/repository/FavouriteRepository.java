@@ -31,4 +31,9 @@ public interface FavouriteRepository extends JpaRepository<Favourite, UUID> {
     );
 
     void deleteByArticle(Article article);
+
+    void deleteByUserAndArticle(
+            UserAccount user,
+            Article article
+    );
 }

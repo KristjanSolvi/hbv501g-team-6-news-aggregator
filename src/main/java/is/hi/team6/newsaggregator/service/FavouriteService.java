@@ -18,4 +18,9 @@ public interface FavouriteService {
             int page,
             int size
     );
+
+    void deleteFavorite(
+            UUID accountId,
+            UUID articleId
+    );
 }
