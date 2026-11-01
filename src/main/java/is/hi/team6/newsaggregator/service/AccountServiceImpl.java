@@ -2,6 +2,7 @@ package is.hi.team6.newsaggregator.service;
 
 import java.util.Locale;
 import java.util.UUID;
+import java.util.Optional;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -86,6 +87,15 @@ public class AccountServiceImpl implements AccountService {
         } catch (DataIntegrityViolationException exception) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already registered");
         }
+    }
+
+    @Override 
+    @Transactional 
+    public void deleteOwnAccount(String email){
+        Optional<UserAccount> account = accounts.findByEmail(email);
+        if (account.isPresent()) {
+            accounts.delete(account.get());
+            };
     }
 
     private String normalizeEmail(String email) {

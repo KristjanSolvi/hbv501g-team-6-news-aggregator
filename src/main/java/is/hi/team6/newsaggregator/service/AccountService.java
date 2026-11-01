@@ -19,4 +19,6 @@ public interface AccountService extends UserDetailsService {
     AccountResponse createAdmin(RegistrationRequest request);
 
     AccountResponse updateOtherAccount(UUID id, UpdateAccountRequest request);
+
+    void deleteOwnAccount(String email);
 }
