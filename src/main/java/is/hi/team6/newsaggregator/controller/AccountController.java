@@ -4,6 +4,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -47,5 +48,12 @@ public class AccountController {
             new HttpSessionSecurityContextRepository().saveContext(context, httpRequest, httpResponse);
         }
         return account;
+    }
+
+    @DeleteMapping 
+    public void deleteOwnAccount(@AuthenticationPrincipal AccountUserDetails principal){
+        accounts.deleteOwnAccount(accounts.getOwnAccount(
+                                    principal.getAccountId())
+                                    .email());
     }
 }
