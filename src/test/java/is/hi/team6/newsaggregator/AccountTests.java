@@ -2,6 +2,7 @@ package is.hi.team6.newsaggregator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.authenticated;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -68,6 +69,7 @@ class AccountTests {
         assertThat(passwords.matches("new-password123", updated.getPasswordHash())).isTrue();
         mvc.perform(get("/api/accounts/me").session(session))
                 .andExpect(status().isOk())
+                .andExpect(authenticated().withUsername("updated@example.com"))
                 .andExpect(jsonPath("$.id").value(account.getId().toString()));
 
         accounts.saveAndFlush(new UserAccount(account.getEmail(), passwords.encode("replacement-password")));

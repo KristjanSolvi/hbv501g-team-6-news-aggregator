@@ -305,6 +305,7 @@ class NewsaggregatorApplicationTests {
         var user = createAccount();
         var article = createArticle("Saved article", "2026-09-01T12:00:00Z", null, user);
         entities.persist(new Favourite(user, article));
+        entities.flush();
         assertThatThrownBy(() -> {
             entities.persist(new Favourite(user, article));
             entities.flush();

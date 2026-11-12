@@ -70,8 +70,14 @@ class FavouriteTests {
         assertThat(favourites.count()).isEqualTo(2);
         mvc.perform(get("/api/favourites?size=1").session(session))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].id").value(first.getId().toString()))
                 .andExpect(jsonPath("$.page.totalElements").value(2));
+        mvc.perform(get("/api/favourites?page=1&size=1").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(second.getId().toString()))
+                .andExpect(jsonPath("$.page.number").value(1));
         accounts.saveAndFlush(new UserAccount("other@example.com", passwords.encode("password123")));
         mvc.perform(get("/api/favourites").session(login("other@example.com")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content").isEmpty());
