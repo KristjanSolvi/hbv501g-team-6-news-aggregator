@@ -2,11 +2,15 @@ package is.hi.team6.newsaggregator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.authenticated;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.time.Instant;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,7 +23,11 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
+import is.hi.team6.newsaggregator.model.Article;
+import is.hi.team6.newsaggregator.model.Favourite;
 import is.hi.team6.newsaggregator.model.UserAccount;
+import is.hi.team6.newsaggregator.repository.ArticleRepository;
+import is.hi.team6.newsaggregator.repository.FavouriteRepository;
 import is.hi.team6.newsaggregator.repository.UserAccountRepository;
 
 @SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:account-test;DB_CLOSE_DELAY=-1")
@@ -28,6 +36,8 @@ class AccountTests {
 
     @Autowired MockMvc mvc;
     @Autowired UserAccountRepository accounts;
+    @Autowired ArticleRepository articles;
+    @Autowired FavouriteRepository favourites;
     @Autowired PasswordEncoder passwords;
 
     UserAccount account;
@@ -39,6 +49,8 @@ class AccountTests {
 
     @AfterEach
     void deleteAccounts() {
+        favourites.deleteAll();
+        articles.deleteAll();
         accounts.deleteAll();
     }
 
@@ -68,6 +80,7 @@ class AccountTests {
         assertThat(passwords.matches("new-password123", updated.getPasswordHash())).isTrue();
         mvc.perform(get("/api/accounts/me").session(session))
                 .andExpect(status().isOk())
+                .andExpect(authenticated().withUsername("updated@example.com"))
                 .andExpect(jsonPath("$.id").value(account.getId().toString()));
 
         accounts.saveAndFlush(new UserAccount(account.getEmail(), passwords.encode("replacement-password")));
@@ -90,6 +103,31 @@ class AccountTests {
         var unchanged = accounts.findById(account.getId()).orElseThrow();
         assertThat(unchanged.getEmail()).isEqualTo(account.getEmail());
         assertThat(unchanged.getPasswordHash()).isEqualTo(account.getPasswordHash());
+    }
+
+    @Test
+    void deleteAccountWithFavourites() throws Exception {
+        var article = articles.saveAndFlush(new Article("Saved article", null, null, "News",
+                Instant.parse("2026-10-01T00:00:00Z"), null, null));
+        favourites.saveAndFlush(new Favourite(account, article));
+
+        mvc.perform(delete("/api/accounts/me").session(login(account.getEmail(), "password123")).with(csrf()))
+                .andExpect(status().isOk());
+
+        assertThat(accounts.findById(account.getId())).isEmpty();
+        assertThat(favourites.count()).isZero();
+        assertThat(articles.existsById(article.getId())).isTrue();
+    }
+
+    @Test
+    void deleteAccountWithOwnArticle() throws Exception {
+        articles.saveAndFlush(new Article("My article", null, null, "News",
+                Instant.parse("2026-10-01T00:00:00Z"), null, account));
+
+        mvc.perform(delete("/api/accounts/me").session(login(account.getEmail(), "password123")).with(csrf()))
+                .andExpect(status().isOk());
+
+        assertThat(accounts.findById(account.getId())).isEmpty();
     }
 
     @Test
