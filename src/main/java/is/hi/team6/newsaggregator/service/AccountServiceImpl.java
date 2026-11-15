@@ -17,6 +17,8 @@ import is.hi.team6.newsaggregator.dto.AccountResponse;
 import is.hi.team6.newsaggregator.dto.RegistrationRequest;
 import is.hi.team6.newsaggregator.dto.UpdateAccountRequest;
 import is.hi.team6.newsaggregator.model.UserAccount;
+import is.hi.team6.newsaggregator.repository.ArticleRepository;
+import is.hi.team6.newsaggregator.repository.FavouriteRepository;
 import is.hi.team6.newsaggregator.repository.UserAccountRepository;
 
 @Service
@@ -24,10 +26,14 @@ public class AccountServiceImpl implements AccountService {
 
     private final UserAccountRepository accounts;
     private final PasswordEncoder passwords;
+    private final FavouriteRepository favourites;
+    private final ArticleRepository articles;
 
-    public AccountServiceImpl(UserAccountRepository accounts, PasswordEncoder passwords) {
+    public AccountServiceImpl(UserAccountRepository accounts, PasswordEncoder passwords, FavouriteRepository favourites, ArticleRepository articles) {
         this.accounts = accounts;
         this.passwords = passwords;
+        this.favourites = favourites;
+        this.articles = articles;
     }
 
     @Override
@@ -98,6 +104,8 @@ public class AccountServiceImpl implements AccountService {
                                         HttpStatus.BAD_REQUEST,
                                         "Missing User Account");         
         };
+        favourites.deleteByUser(account.get());
+        articles.removeOwnershipByUser(account.get());
         accounts.delete(account.get());
         
     }
