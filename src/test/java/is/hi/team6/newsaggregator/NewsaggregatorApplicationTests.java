@@ -305,6 +305,7 @@ class NewsaggregatorApplicationTests {
         var user = createAccount();
         var article = createArticle("Saved article", "2026-09-01T12:00:00Z", null, user);
         entities.persist(new Favourite(user, article));
+        entities.flush();
         assertThatThrownBy(() -> {
             entities.persist(new Favourite(user, article));
             entities.flush();
@@ -607,7 +608,18 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
                                 {
                                 "name": "Miss Information",
                                 "url": "https://ms.information"
-                                }""")).andExpect(status().isCreated());
+                                }"""))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNotEmpty())
+                .andExpect(jsonPath("$.name").value("Miss Information"))
+                .andExpect(jsonPath("$.url").value("https://ms.information"));
+
+        entities.flush();
+        entities.clear();
+        assertThat(sources.count()).isEqualTo(1);
+        var source = sources.findAll().get(0);
+        assertThat(source.getName()).isEqualTo("Miss Information");
+        assertThat(source.getUrl()).isEqualTo("https://ms.information");
         }
 
         @Test 
@@ -620,7 +632,8 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
                                 {
                                 "name": "Miss Information",
                                 "url": "https://ms.information"
-                                }""")).andExpect(status().is4xxClientError());
+                                }""")).andExpect(status().isForbidden());
+        assertThat(sources.count()).isZero();
         }
 
         @Test 
@@ -657,9 +670,8 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
                         .andExpect(jsonPath("$[0].name")
                         .value("Miss Information"))
                         .andReturn();
-                var jsonMapper = JsonMapper.builder().build();
-                var json = jsonMapper.readTree(response.getResponse().getContentAsString());
-                id = UUID.fromString(json.get(0).get("id").asString());
+                id = UUID.fromString(json.readTree(response.getResponse().getContentAsString())
+                        .get(0).get("id").asString());
                 mvc.perform(put("/api/admin/newssources/"+id.toString())
                         .with(user("admin@example.com").roles("ADMIN"))
                         .with(csrf())
@@ -667,14 +679,17 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
                         .content("""
                         {
                         "name":"Moss Information",
-                        "url":"https://ms.information"                
+                        "url":"https://moss.information"
                         }        
                         """)).andExpect(status().isOk());
+                entities.flush();
+                entities.clear();
                 mvc.perform(get("/api/admin/newssources/sources")
                         .with(user("admin@example.com").roles("ADMIN"))
                         .with(csrf())).andExpect(status().isOk())
-                        .andExpect(jsonPath("$[0].name")
-                        .value("Moss Information"));     
+                        .andExpect(jsonPath("$[0].id").value(id.toString()))
+                        .andExpect(jsonPath("$[0].name").value("Moss Information"))
+                        .andExpect(jsonPath("$[0].url").value("https://moss.information"));
 }
         
         @Test 
@@ -695,18 +710,22 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
                         .andExpect(jsonPath("$[0].name")
                         .value("Miss Information"))
                         .andReturn();
-                var jsonMapper = JsonMapper.builder().build();
-                var json = jsonMapper.readTree(response.getResponse().getContentAsString());
-                id = UUID.fromString(json.get(0).get("id").asString());
+                id = UUID.fromString(json.readTree(response.getResponse().getContentAsString())
+                        .get(0).get("id").asString());
+                var other = sources.saveAndFlush(new NewsSource("Other News", "https://other.example.com"));
                 mvc.perform(delete("/api/admin/newssources/"+id.toString())
                         .with(user("admin@example.com").roles("ADMIN"))
                         .with(csrf()))
                         .andExpect(status().isNoContent());
+                entities.flush();
+                entities.clear();
                 mvc.perform(get("/api/admin/newssources/sources")
                         .with(user("admin@example.com").roles("ADMIN"))
                         .with(csrf())).andExpect(status().isOk())
                         .andExpect(jsonPath("$[?(@.id == '" + id + "')]")
-                        .doesNotExist());     
+                        .doesNotExist())
+                        .andExpect(jsonPath("$.length()").value(1))
+                        .andExpect(jsonPath("$[0].id").value(other.getId().toString()));
 }
 
     private UserAccount createAccount() {
