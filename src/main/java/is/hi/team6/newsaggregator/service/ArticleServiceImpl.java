@@ -2,6 +2,7 @@ package is.hi.team6.newsaggregator.service;
 
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -16,6 +17,7 @@ import is.hi.team6.newsaggregator.dto.ArticleResponse;
 import is.hi.team6.newsaggregator.dto.ArticleSummary;
 import is.hi.team6.newsaggregator.dto.ArticleSearchCriteria;
 import is.hi.team6.newsaggregator.dto.ArticleUpdateRequest;
+import is.hi.team6.newsaggregator.event.ArticleAddedEvent;
 import is.hi.team6.newsaggregator.model.Article;
 import is.hi.team6.newsaggregator.repository.ArticleRepository;
 import is.hi.team6.newsaggregator.repository.NewsSourceRepository;
@@ -29,12 +31,14 @@ public class ArticleServiceImpl implements ArticleService {
     private final UserAccountRepository accounts;
     private final NewsSourceRepository sources;
     private final FavouriteRepository favourites;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public ArticleServiceImpl( ArticleRepository articles, UserAccountRepository accounts, NewsSourceRepository sources, FavouriteRepository favourites) {
+    public ArticleServiceImpl( ArticleRepository articles, UserAccountRepository accounts, NewsSourceRepository sources, FavouriteRepository favourites, ApplicationEventPublisher eventPublisher) {
         this.articles = articles;
         this.accounts = accounts;
         this.sources = sources;
         this.favourites = favourites;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -128,8 +132,11 @@ public class ArticleServiceImpl implements ArticleService {
                 source,
                 owner
         );
+        Article savedArticle = articles.save(article); 
 
-        return ArticleResponse.from(articles.save(article));
+        eventPublisher.publishEvent(new ArticleAddedEvent(owner, savedArticle));
+
+        return ArticleResponse.from(savedArticle);
     }
 
     @Override
