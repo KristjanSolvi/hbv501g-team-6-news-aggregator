@@ -744,7 +744,7 @@ void unauthenticatedUserCannotImportArticles() throws Exception {
         var owner = createAccount();
         var principal = accountService.loadUserByUsername(owner.getEmail());
         var article = createArticle("My article", "2026-10-10T12:00:00Z", null, owner);
-        accountService.updateOwnAccount(owner.getId(), new UpdateAccountRequest("renamed@example.com", null));
+        accountService.updateOwnAccount( new UpdateAccountRequest("renamed@example.com", null));
         var replacement = accounts.saveAndFlush(
                 new UserAccount("reader@example.com", passwords.encode("password123")));
         var otherArticle = createArticle("Other article", "2026-10-10T12:00:00Z", null, replacement);

@@ -30,15 +30,15 @@ public class AccountController {
     }
 
     @GetMapping
-    public AccountResponse getOwnAccount(@AuthenticationPrincipal AccountUserDetails principal) {
-        return accounts.getOwnAccount(principal.getAccountId());
+    public AccountResponse getOwnAccount() {
+        return accounts.getOwnAccount();
     }
 
     @PutMapping
     public AccountResponse updateOwnAccount(@Valid @RequestBody UpdateAccountRequest request,
                                            @AuthenticationPrincipal AccountUserDetails principal,
                                            HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
-        var account = accounts.updateOwnAccount(principal.getAccountId(), request);
+        var account = accounts.updateOwnAccount(request);
         if (!account.email().equals(principal.getUsername())) {
             var updated = new AccountUserDetails(account.id(), account.email(), "", account.role());
             var context = SecurityContextHolder.createEmptyContext();
@@ -52,8 +52,7 @@ public class AccountController {
 
     @DeleteMapping 
     public void deleteOwnAccount(@AuthenticationPrincipal AccountUserDetails principal){
-        accounts.deleteOwnAccount(accounts.getOwnAccount(
-                                    principal.getAccountId())
+        accounts.deleteOwnAccount(accounts.getOwnAccount()
                                     .email());
     }
 }

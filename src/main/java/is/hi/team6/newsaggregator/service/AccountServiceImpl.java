@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -44,14 +45,16 @@ public class AccountServiceImpl implements AccountService {
 
     @Override
     @Transactional(readOnly = true)
-    public AccountResponse getOwnAccount(UUID id) {
-        return AccountResponse.from(findAccount(id));
+    public AccountResponse getOwnAccount() {
+        AccountUserDetails auth = (AccountUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return AccountResponse.from(findAccount(auth.getAccountId()));
     }
 
     @Override
     @Transactional
-    public AccountResponse updateOwnAccount(UUID id, UpdateAccountRequest request) {
-        return updateAccount(findAccount(id), request);
+    public AccountResponse updateOwnAccount(UpdateAccountRequest request) {
+        AccountUserDetails auth = (AccountUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return updateAccount(findAccount(auth.getAccountId()), request);
     }
 
     @Override

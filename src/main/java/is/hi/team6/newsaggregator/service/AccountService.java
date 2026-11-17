@@ -12,13 +12,13 @@ public interface AccountService extends UserDetailsService {
 
     AccountResponse register(RegistrationRequest request);
 
-    AccountResponse getOwnAccount(UUID id);
+    AccountResponse getOwnAccount();
 
-    AccountResponse updateOwnAccount(UUID id, UpdateAccountRequest request);
+    AccountResponse updateOwnAccount(UpdateAccountRequest request);
 
     AccountResponse createAdmin(RegistrationRequest request);
 
-    AccountResponse updateOtherAccount(UUID id, UpdateAccountRequest request);
+    AccountResponse updateOtherAccount(UUID id,UpdateAccountRequest request);
 
     void deleteOwnAccount(String email);
 }
