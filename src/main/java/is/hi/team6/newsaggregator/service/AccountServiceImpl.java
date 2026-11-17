@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -46,15 +47,17 @@ public class AccountServiceImpl implements AccountService {
     @Override
     @Transactional(readOnly = true)
     public AccountResponse getOwnAccount() {
-        AccountUserDetails auth = (AccountUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return AccountResponse.from(findAccount(auth.getAccountId()));
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        AccountUserDetails user = (AccountUserDetails) auth.getPrincipal();
+        return AccountResponse.from(findAccount(user.getAccountId()));
     }
 
     @Override
     @Transactional
     public AccountResponse updateOwnAccount(UpdateAccountRequest request) {
-        AccountUserDetails auth = (AccountUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return updateAccount(findAccount(auth.getAccountId()), request);
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        AccountUserDetails user = (AccountUserDetails) auth.getPrincipal();
+        return updateAccount(findAccount(user.getAccountId()), request);
     }
 
     @Override
@@ -83,6 +86,7 @@ public class AccountServiceImpl implements AccountService {
     }
 
     private AccountResponse updateAccount(UserAccount account, UpdateAccountRequest request) {
+        
         account.changeEmail(normalizeEmail(request.email()));
         if (request.password() != null) {
             account.changePasswordHash(passwords.encode(request.password()));
